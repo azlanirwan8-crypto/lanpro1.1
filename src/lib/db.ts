@@ -153,7 +153,7 @@ export function executeSqlInMemory(_sql: string, _params?: any[]): never {
 // ─────────────────────────────────────────────
 // PostgreSQL Connection Pool
 // ─────────────────────────────────────────────
-const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || 'postgresql://neondb_owner:npg_CVZvaYbF8W2s@ep-dawn-shape-aulnhaw2-pooler.c-10.us-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require';
+const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
 
 if (!connectionString) {
   throw new Error(

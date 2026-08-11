@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit && tsx scripts/validate/validate-permissions.ts",
+    "test": "jest",
     "test:reporter": "tsx scripts/test/test-reporter-assignment.ts",
     "validate:permissions": "tsx scripts/validate/validate-permissions.ts",
     "db:migrate": "tsx server/migrations/runner.ts"
