@@ -1,3 +1,7 @@
+import { createRequire } from "module";
+
+const requireFunc = createRequire(import.meta.url);
+
 let serverModule: any = null;
 let serverLoadError: any = null;
 
@@ -5,8 +9,7 @@ function getServerModule() {
   if (serverModule) return serverModule;
   if (serverLoadError) throw serverLoadError;
   try {
-    // @ts-ignore
-    serverModule = require("../dist/server.cjs");
+    serverModule = requireFunc("../dist/server.cjs");
     return serverModule;
   } catch (err) {
     serverLoadError = err;
