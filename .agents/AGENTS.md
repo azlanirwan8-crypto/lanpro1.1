@@ -22,4 +22,11 @@ Dilarang keras menambahkan rute API berserta logikanya langsung ke dalam `server
 - **Jangan pernah menyisipkan Token Rahasia, Password, atau URL Database langsung ke dalam kode (.ts, .tsx).**
 - **Jangan membangun komponen raksasa (God Components).** Jika file melewati 800 baris, Anda harus memecahnya.
 
+### 4. DATABASE & SQL QUERY COMPATIBILITY (POSTGRESQL / NEON DB)
+- **Dilarang Sintaks MySQL Specific**: Dilarang keras menggunakan `ON DUPLICATE KEY UPDATE` dalam query backend. Wajib menggunakan DB-Agnostic SELECT check -> UPDATE/INSERT pattern.
+- **Ekspansi Array `IN (?)`**: Dilarang passing array langsung ke placeholder single `IN (?)`. Wajib gunakan ekspansi dinamis `IN (${ids.map(() => '?').join(',')})` dengan spread `[...ids]`.
+
+### 5. ATURAN GIT COMMIT REPOSITORI
+- **Commit Invariant**: Setiap penambahan fitur atau perbaikan bug yang telah berhasil diverifikasi wajib di-commit ke repositori Git local.
+
 Setiap pekerjaan Anda yang melanggar struktur ini akan ditolak secara otomatis.
