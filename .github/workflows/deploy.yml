@@ -106,8 +106,11 @@ jobs:
           echo "[BNI-AUDIT] Untuk mengaktifkan auto-SSH deploy, isi PROD_SERVER_IP & PROD_SERVER_USER di GitHub Secrets."
 
       - name: Trigger Vercel Production Deployment
-        if: ${{ secrets.VERCEL_DEPLOY_HOOK != '' }}
         run: |
           echo "[VERCEL-DEPLOY] Memicu Vercel Auto-Deploy Hook..."
-          curl -s -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
-          echo "[VERCEL-DEPLOY] Hook Vercel berhasil dikirim."
+          HOOK_URL="${{ secrets.VERCEL_DEPLOY_HOOK }}"
+          if [ -z "$HOOK_URL" ]; then
+            HOOK_URL="https://api.vercel.com/v1/integrations/deploy/prj_gFghqJkbTCDIgK82x1sdV3AsAwLN/pQFMLbAykv"
+          fi
+          curl -s -X POST "$HOOK_URL"
+          echo "[VERCEL-DEPLOY] Hook Vercel berhasil dikirim dan diproses."
