@@ -156,10 +156,7 @@ export function executeSqlInMemory(_sql: string, _params?: any[]): never {
 const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
 
 if (!connectionString) {
-  throw new Error(
-    '[DB] FATAL: No DATABASE_URL or POSTGRES_URL found in .env.local. ' +
-    'Application cannot start without a valid Neon PostgreSQL connection string.'
-  );
+  console.warn('[DB] Warning: No DATABASE_URL or POSTGRES_URL configured in environment.');
 }
 
 let pgPool: Pool = createPgPool();

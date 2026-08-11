@@ -4567,4 +4567,4 @@ app.use(errorHandler);
   });
 }
 
-export const initializationPromise = startServer();
+export const initializationPromise = process.env.NODE_ENV !== 'test' ? startServer() : Promise.resolve();
