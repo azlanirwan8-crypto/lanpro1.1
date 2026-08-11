@@ -643,10 +643,22 @@ const router = express.Router();
           );
           if ((users as any[]).length > 0) {
             const resolvedUserId = (users as any[])[0].id;
-            await connection.query(
-              "INSERT INTO ProjectMembers (projectId, userId, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)",
-              [id, resolvedUserId, role]
+            const [existing] = await connection.query(
+              "SELECT * FROM ProjectMembers WHERE projectId = ? AND userId = ?",
+              [id, resolvedUserId]
             );
+
+            if ((existing as any[]).length > 0) {
+              await connection.query(
+                "UPDATE ProjectMembers SET role = ? WHERE projectId = ? AND userId = ?",
+                [role, id, resolvedUserId]
+              );
+            } else {
+              await connection.query(
+                "INSERT INTO ProjectMembers (projectId, userId, role) VALUES (?, ?, ?)",
+                [id, resolvedUserId, role]
+              );
+            }
           }
         }
       }
@@ -660,14 +672,27 @@ const router = express.Router();
          );
          if ((users as any[]).length > 0) {
            const resolvedUserId = (users as any[])[0].id;
-           await connection.query(
-              "INSERT INTO ProjectMembers (projectId, userId, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)",
-              [id, resolvedUserId, newMemberRole]
+
+           const [existing] = await connection.query(
+             "SELECT * FROM ProjectMembers WHERE projectId = ? AND userId = ?",
+             [id, resolvedUserId]
            );
 
-           // Handle hierarchy for Project Admin ('admin')
+           if ((existing as any[]).length > 0) {
+             await connection.query(
+               "UPDATE ProjectMembers SET role = ? WHERE projectId = ? AND userId = ?",
+               [newMemberRole, id, resolvedUserId]
+             );
+           } else {
+             await connection.query(
+               "INSERT INTO ProjectMembers (projectId, userId, role) VALUES (?, ?, ?)",
+               [id, resolvedUserId, newMemberRole]
+             );
+           }
+
+           // Handle hierarchy for Project Admin / Manager / Lead
            const { teamMemberIds } = req.body;
-           if (newMemberRole === 'admin' && Array.isArray(teamMemberIds) && teamMemberIds.length > 0) {
+           if (['admin', 'manager', 'lead'].includes(String(newMemberRole).toLowerCase()) && Array.isArray(teamMemberIds) && teamMemberIds.length > 0) {
              for (const tmId of teamMemberIds) {
                const [tmUsers] = await connection.query(
                  "SELECT id FROM Users WHERE id = ? OR uid = ?",
@@ -675,10 +700,22 @@ const router = express.Router();
                );
                if ((tmUsers as any[]).length > 0) {
                  const resolvedTmId = (tmUsers as any[])[0].id;
-                 await connection.query(
-                   "INSERT INTO ProjectMembers (projectId, userId, role, parentAdminId) VALUES (?, ?, 'member', ?) ON DUPLICATE KEY UPDATE parentAdminId = VALUES(parentAdminId)",
-                   [id, resolvedTmId, resolvedUserId]
+                 const [tmExisting] = await connection.query(
+                   "SELECT * FROM ProjectMembers WHERE projectId = ? AND userId = ?",
+                   [id, resolvedTmId]
                  );
+
+                 if ((tmExisting as any[]).length > 0) {
+                   await connection.query(
+                     "UPDATE ProjectMembers SET parentAdminId = ? WHERE projectId = ? AND userId = ?",
+                     [resolvedUserId, id, resolvedTmId]
+                   );
+                 } else {
+                   await connection.query(
+                     "INSERT INTO ProjectMembers (projectId, userId, role, parentAdminId) VALUES (?, ?, 'member', ?)",
+                     [id, resolvedTmId, resolvedUserId]
+                   );
+                 }
                }
              }
            }
