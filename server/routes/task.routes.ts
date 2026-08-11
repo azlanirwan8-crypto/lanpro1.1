@@ -1139,6 +1139,7 @@ function checkUserPermissionBackend(role: string, customPermissions: any, action
         }
       }
       
+      const placeholders = userIds.map(() => '?').join(',');
       // Secure, high-performance, and unified candidate selection query (Anti-IDOR)
       const sqlQuery = `
         SELECT n.*, 
@@ -1149,12 +1150,12 @@ function checkUserPermissionBackend(role: string, customPermissions: any, action
         LEFT JOIN Tasks t ON n.relatedId = t.id
         LEFT JOIN Meetings m ON n.relatedId = m.id
         LEFT JOIN ActivityLogs a ON n.relatedId = a.id
-        WHERE n.recipientId IN (?)
+        WHERE n.recipientId IN (${placeholders})
         ORDER BY n.createdAt DESC
         LIMIT 150
       `;
       
-      const [rows]: any = await connection.query(sqlQuery, [userIds]);
+      const [rows]: any = await connection.query(sqlQuery, [...userIds]);
       
       // Dynamic multi-layered verification filter for role-based security & spam protection
       const filteredNotifications = rows.filter((row: any) => {
