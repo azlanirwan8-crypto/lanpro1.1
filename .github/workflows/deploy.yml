@@ -104,3 +104,10 @@ jobs:
         run: |
           echo "[BNI-AUDIT] Build artifact versi ${{ github.sha }} disiapkan & terverifikasi 100% aman (Pre-Production Ready)."
           echo "[BNI-AUDIT] Untuk mengaktifkan auto-SSH deploy, isi PROD_SERVER_IP & PROD_SERVER_USER di GitHub Secrets."
+
+      - name: Trigger Vercel Production Deployment
+        if: ${{ secrets.VERCEL_DEPLOY_HOOK != '' }}
+        run: |
+          echo "[VERCEL-DEPLOY] Memicu Vercel Auto-Deploy Hook..."
+          curl -s -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
+          echo "[VERCEL-DEPLOY] Hook Vercel berhasil dikirim."
