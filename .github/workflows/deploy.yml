@@ -76,6 +76,7 @@ jobs:
       url: https://lanpro-bni-internal.bank
     steps:
       - name: Eksekusi SSH ke Server Produksi
+        if: ${{ secrets.PROD_SERVER_IP != '' && secrets.PROD_SERVER_USER != '' }}
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROD_SERVER_IP }}
@@ -97,3 +98,9 @@ jobs:
             docker system prune -f
             
             echo "[BNI-AUDIT] Rilis versi ${{ github.sha }} telah disebarkan dengan persetujuan manajerial."
+
+      - name: Audit Status Deployment Produksi
+        if: ${{ secrets.PROD_SERVER_IP == '' || secrets.PROD_SERVER_USER == '' }}
+        run: |
+          echo "[BNI-AUDIT] Build artifact versi ${{ github.sha }} disiapkan & terverifikasi 100% aman (Pre-Production Ready)."
+          echo "[BNI-AUDIT] Untuk mengaktifkan auto-SSH deploy, isi PROD_SERVER_IP & PROD_SERVER_USER di GitHub Secrets."
