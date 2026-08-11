@@ -153,7 +153,7 @@ export function executeSqlInMemory(_sql: string, _params?: any[]): never {
 // ─────────────────────────────────────────────
 // PostgreSQL Connection Pool
 // ─────────────────────────────────────────────
-const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || 'postgresql://neondb_owner:npg_CVZvaYbF8W2s@ep-dawn-shape-aulnhaw2-pooler.c-10.us-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require';
 
 if (!connectionString) {
   console.warn('[DB] Warning: No DATABASE_URL or POSTGRES_URL configured in environment.');
@@ -181,12 +181,13 @@ function createPgPool(connStr?: string): Pool {
 }
 
 // Verify connection on startup
-pgPool.query('SELECT 1')
-
-  .catch((err) => {
-    console.warn('⚠️ [PostgreSQL] Startup check: Cannot connect to Neon PostgreSQL:', err.message);
-    console.warn('   → Will retry connection dynamically on request.');
-  });
+if (connectionString) {
+  pgPool.query('SELECT 1')
+    .catch((err) => {
+      console.warn('⚠️ [PostgreSQL] Startup check: Cannot connect to Neon PostgreSQL:', err.message);
+      console.warn('   → Will retry connection dynamically on request.');
+    });
+}
 
 
 // ─────────────────────────────────────────────
