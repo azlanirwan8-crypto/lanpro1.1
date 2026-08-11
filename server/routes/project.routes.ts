@@ -41,7 +41,7 @@ const router = express.Router();
         const [allMemberRows]: any = await connection.query(
           `SELECT pm.projectId, u.uid, u.id as uuid, pm.role 
            FROM ProjectMembers pm
-           JOIN Users u ON pm.userId = u.id
+           JOIN Users u ON (pm.userId = u.id OR pm.userId = u.uid)
            WHERE pm.projectId IN (?)`,
           [projectIds]
         );
@@ -53,9 +53,10 @@ const router = express.Router();
             membersByProject.set(row.projectId, { list: [], roles: {} });
           }
           const pData = membersByProject.get(row.projectId);
-          pData.list.push(row.uid);
-          pData.roles[row.uid] = row.role || 'viewer';
-          pData.roles[row.uuid] = row.role || 'viewer';
+          if (row.uid && !pData.list.includes(row.uid)) pData.list.push(row.uid);
+          if (row.uuid && !pData.list.includes(row.uuid)) pData.list.push(row.uuid);
+          if (row.uid) pData.roles[row.uid] = row.role || 'viewer';
+          if (row.uuid) pData.roles[row.uuid] = row.role || 'viewer';
         }
         
         for (const p of projects) {

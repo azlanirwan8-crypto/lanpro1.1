@@ -149,6 +149,7 @@ export const UserDetailView: React.FC<UserDetailViewProps> = ({
   useEffect(() => {
     const list = (projects || []).filter(p =>
       (p.members && (p.members.includes(user.id) || p.members.includes(user.uid))) ||
+      (p.memberRoles && (p.memberRoles[user.id] || p.memberRoles[user.uid])) ||
       p.ownerId === user.id ||
       p.ownerId === user.uid
     );
