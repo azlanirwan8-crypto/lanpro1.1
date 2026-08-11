@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { DEFAULT_PERMISSIONS as LIB_DEFAULT_PERMISSIONS, KEY_MAP, normalizeModuleKey } from '../src/lib/permissions';
-import { DEFAULT_PERMISSIONS as USER_DEFAULT_PERMISSIONS } from '../src/features/users/types';
+import { DEFAULT_PERMISSIONS as LIB_DEFAULT_PERMISSIONS, KEY_MAP, normalizeModuleKey } from '../../src/lib/permissions';
+import { DEFAULT_PERMISSIONS as USER_DEFAULT_PERMISSIONS } from '../../src/features/users/types';
 
 console.log('----------------------------------------------------');
 console.log('🔒 RBAC & Permission Validation Script');
@@ -10,9 +10,14 @@ console.log('----------------------------------------------------');
 let errors: string[] = [];
 let warnings: string[] = [];
 
-// 1. Read UserPermissions interface keys from src/types.ts
-const typesFilePath = path.resolve('src/types.ts');
-const typesContent = fs.readFileSync(typesFilePath, 'utf-8');
+// 1. Read UserPermissions interface keys from src/types/user.ts (or src/types.ts / src/types/index.ts)
+const possibleTypesPaths = [
+  path.resolve('src/types/user.ts'),
+  path.resolve('src/types/index.ts'),
+  path.resolve('src/types.ts')
+];
+const typesFilePath = possibleTypesPaths.find(p => fs.existsSync(p)) || path.resolve('src/types/user.ts');
+const typesContent = fs.existsSync(typesFilePath) ? fs.readFileSync(typesFilePath, 'utf-8') : '';
 
 const userPermissionsMatch = typesContent.match(/export interface UserPermissions \{([\s\S]*?)\}/);
 if (!userPermissionsMatch) {
@@ -39,7 +44,7 @@ const featureFolders = fs.readdirSync(featuresDir).filter(f => {
 });
 
 // Folders that are internal sub-components, dialogs, or sub-widgets rather than primary permissioned views
-const EXCLUDED_FEATURE_FOLDERS = new Set(['sidebar', 'CreateIssueBar', 'activity', 'backup', 'connect']);
+const EXCLUDED_FEATURE_FOLDERS = new Set(['sidebar', 'CreateIssueBar', 'activity', 'backup', 'connect', 'auth']);
 
 console.log(`\n📁 Feature directories in src/features (${featureFolders.length}):`);
 

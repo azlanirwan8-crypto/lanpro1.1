@@ -1,4 +1,4 @@
-import mysqlPool from "../src/lib/db";
+import mysqlPool from "../../src/lib/db";
 
 async function run() {
   try {

@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import readline from 'readline';
 import { Pool } from 'pg';
-import { runMigrations } from '../src/lib/pg-migrate';
+import { runMigrations } from '../../src/lib/pg-migrate';
 
 // Parse .env.local manually
 const envPath = path.join(process.cwd(), '.env.local');

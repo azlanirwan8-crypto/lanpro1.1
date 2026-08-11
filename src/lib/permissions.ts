@@ -113,7 +113,9 @@ export const KEY_MAP: Record<string, string> = {
   explorer: 'dbExplorer',
   'enterprise-audit': 'auditLog',
   auditLogs: 'auditLog',
-  configuration: 'masterData'
+  configuration: 'masterData',
+  'meeting-notes': 'meetingNotes',
+  'notebook-lm': 'notebooklm'
 };
 
 export function normalizeModuleKey(key: string): string {

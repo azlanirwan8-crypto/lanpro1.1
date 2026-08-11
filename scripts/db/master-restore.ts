@@ -14,7 +14,7 @@ import path from 'path';
 import fs from 'fs';
 import readline from 'readline';
 import { Pool } from 'pg';
-import { runMigrations } from '../src/lib/pg-migrate';
+import { runMigrations } from '../../src/lib/pg-migrate';
 
 dotenvLocal.config({ path: path.join(process.cwd(), '.env.local'), override: false });
 

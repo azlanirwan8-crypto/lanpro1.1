@@ -1,4 +1,4 @@
-import pool from '../src/lib/db';
+import pool from '../../src/lib/db';
 
 async function testConnection() {
   console.log("Mencoba menghubungkan ke database PostgreSQL (Neon)...");
