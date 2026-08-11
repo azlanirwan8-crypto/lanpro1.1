@@ -81,14 +81,14 @@ const router = express.Router();
 
 
   router.post("/api/auth/google-verify", async (req, res) => {
-      if (!admin.apps.length) {
+      if (!((admin as any).apps && (admin as any).apps.length > 0)) {
           admin.initializeApp({
-              credential: admin.credential.applicationDefault()
+              credential: (admin as any).credential.applicationDefault()
           });
       }
       const { idToken } = req.body;
       try {
-          const decodedToken = await admin.auth().verifyIdToken(idToken);
+          const decodedToken = await (admin as any).auth().verifyIdToken(idToken);
           const email = decodedToken.email;
           
           if (!email) {
@@ -319,11 +319,14 @@ const router = express.Router();
 
       if (force) {
         // Broadcast force logout event to old sessions
-        req.io.emit("FORCE_LOGOUT_EVENT", { 
-          userId: userId.toString(), 
-          newToken: token,
-          browserSessionId: req.body.browserSessionId || ''
-        });
+        const io = req.app.get('io') || (req as any).io;
+        if (io) {
+          io.emit("FORCE_LOGOUT_EVENT", { 
+            userId: userId.toString(), 
+            newToken: token,
+            browserSessionId: req.body.browserSessionId || ''
+          });
+        }
       }
       return res.json({
         status: "success",
@@ -385,11 +388,14 @@ const router = express.Router();
         browserSessionId: req.body.browserSessionId || ''
       });
 
-      req.io.emit("FORCE_LOGOUT_EVENT", { 
-        userId: userId.toString(), 
-        newToken: token,
-        browserSessionId: req.body.browserSessionId || ''
-      });
+      const io = req.app.get('io') || (req as any).io;
+      if (io) {
+        io.emit("FORCE_LOGOUT_EVENT", { 
+          userId: userId.toString(), 
+          newToken: token,
+          browserSessionId: req.body.browserSessionId || ''
+        });
+      }
 
       return res.json({
         status: "success",

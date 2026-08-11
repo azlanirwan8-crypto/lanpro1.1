@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { apiRequest } from "../../lib/api";
 import { validateFileClient } from "../../lib/fileSecurity";
 import { motion, AnimatePresence } from "motion/react";
+import { UserAvatar } from "../../components/ui/UserAvatar";
 
 // Helper to attach token to raw fetch calls
 const apiFetch = async (url: string, options: any = {}) => {
@@ -59,7 +60,6 @@ export function TestQAPanel({
   
   // Modals & New Tabs State
   const [activeAddTab, setActiveAddTab] = useState<"single" | "bulk">("single");
-  const [bulkUploadPhase, setBulkUploadPhase] = useState<"SIT" | "UAT" | "PTR">("SIT");
   const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null);
   
   // Full-Stack Database States
@@ -93,6 +93,8 @@ export function TestQAPanel({
   const [isAddSuiteOpen, setIsAddSuiteOpen] = useState(false);
   const [newSuiteNameOnly, setNewSuiteNameOnly] = useState("");
   const [newSuitePhaseOnly, setNewSuitePhaseOnly] = useState<"SIT" | "UAT" | "PTR">("SIT");
+  const [newSuiteAssignedTo, setNewSuiteAssignedTo] = useState("");
+  const [newCaseAssignedTo, setNewCaseAssignedTo] = useState("");
   const [newCaseTitle, setNewCaseTitle] = useState("");
   
   // Custom Dialog States (to avoid iframe blocked prompt/confirm)
@@ -100,15 +102,20 @@ export function TestQAPanel({
   const [caseToDelete, setCaseToDelete] = useState<string | null>(null);
   const [suiteToEdit, setSuiteToEdit] = useState<QATestSuite | null>(null);
   const [suiteEditName, setSuiteEditName] = useState("");
+  const [suiteEditAssignedTo, setSuiteEditAssignedTo] = useState("");
   const [caseToEditInfo, setCaseToEditInfo] = useState<QATestCase | null>(null);
   const [caseEditTitle, setCaseEditTitle] = useState("");
+  const [caseEditSteps, setCaseEditSteps] = useState("");
+  const [caseEditExpected, setCaseEditExpected] = useState("");
+  const [caseEditPriority, setCaseEditPriority] = useState<"Low" | "Medium" | "High" | "Critical">("Medium");
+  const [caseEditAssignedTo, setCaseEditAssignedTo] = useState("");
   const [newCaseSteps, setNewCaseSteps] = useState("");
   const [newCaseExpected, setNewCaseExpected] = useState("");
   const [newCasePriority, setNewCasePriority] = useState<"Low" | "Medium" | "High" | "Critical">("Medium");
-  const [newCaseSuiteOption, setNewCaseSuiteOption] = useState<"existing" | "new">("existing");
-  const [newCaseSuiteId, setNewCaseSuiteId] = useState("");
-  const [newCaseNewSuiteName, setNewCaseNewSuiteName] = useState("");
-  const [newCaseNewSuitePhase, setNewCaseNewSuitePhase] = useState<"SIT" | "UAT" | "PTR">("SIT");
+  const [newCasePreConditions, setNewCasePreConditions] = useState("");
+  const [newCaseTestData, setNewCaseTestData] = useState("");
+  const [activeSuitePicDropdownId, setActiveSuitePicDropdownId] = useState<string | null>(null);
+  const [activeCasePicDropdownId, setActiveCasePicDropdownId] = useState<string | null>(null);
 
   // Loading / Filter states
   const [phaseFilter, setPhaseFilter] = useState<"ALL" | "SIT" | "UAT" | "PTR">("ALL");
@@ -694,6 +701,16 @@ export function TestQAPanel({
       return;
     }
 
+    // Check PIC assignment permission
+    const targetSuite = suites.find(s => s.cases.some(c => c.id === caseId));
+    const targetCase = targetSuite?.cases.find(c => c.id === caseId);
+    const isManagerOrAdmin = currentUserRole === "admin" || currentUserRole === "head" || currentUserRole === "manager";
+    const assignedTo = targetCase?.assignedTo || targetSuite?.assignedTo;
+    if (assignedTo && assignedTo !== "ALL" && assignedTo !== currentUserUid && !isManagerOrAdmin) {
+      toast.error("Hanya PIC yang ditugaskan (atau Admin/Lead) yang dapat mengeksekusi test case ini.");
+      return;
+    }
+
     // Optimistic UI update for instant feedback!
     const updatedSuites = suites.map(suite => {
       const isTargetSuite = suite.cases.some(c => c.id === caseId);
@@ -742,9 +759,14 @@ export function TestQAPanel({
       toast.error("Pilih file excel terlebih dahulu");
       return;
     }
+    const targetSuiteId = selectedSuiteId;
+    if (!targetSuiteId) {
+      toast.error("Mohon pilih modul testing terlebih dahulu dari daftar modul di sebelah kiri");
+      return;
+    }
     const formData = new FormData();
     formData.append("file", bulkUploadFile);
-    formData.append("phase", bulkUploadPhase);
+    formData.append("suiteId", targetSuiteId);
     formData.append("projectId", selectedProject.id);
     formData.append("uploaderName", currentUserName);
     
@@ -765,7 +787,6 @@ export function TestQAPanel({
         if (data.data && data.data.suiteId) {
           loadSuitesFromBackend();
           setSelectedSuiteId(data.data.suiteId);
-          setPhaseFilter(bulkUploadPhase);
         }
       }
     } catch (err: any) {
@@ -782,50 +803,15 @@ export function TestQAPanel({
       return;
     }
 
-    let targetSuiteId = "";
+    const targetSuiteId = selectedSuiteId;
+    if (!targetSuiteId) {
+      toast.error("Mohon pilih modul testing terlebih dahulu dari daftar modul di sebelah kiri");
+      return;
+    }
+
     toast.loading("Menambahkan test case baru...");
 
     try {
-      if (newCaseSuiteOption === "new") {
-        if (!newCaseNewSuiteName) {
-          toast.error("Mohon masukkan nama dokumen baru");
-          return;
-        }
-        const newSuiteId = `suite-${Date.now()}`;
-        const newSuite: QATestSuite = {
-          id: newSuiteId,
-          projectId: selectedProject.id,
-          name: newCaseNewSuiteName + ` (${newCaseNewSuitePhase})`,
-          phase: newCaseNewSuitePhase,
-          uploadedBy: currentUserName,
-          uploadedAt: new Date().toISOString(),
-          fileName: "manual_creation.xlsx",
-          cases: []
-        };
-        
-        // Post new suite to backend!
-        await apiRequest(`/api/projects/${selectedProject.id}/qa-test-suites`, {
-          method: "POST",
-          body: {
-            id: newSuite.id,
-            name: newSuite.name,
-            phase: newSuite.phase,
-            uploadedBy: newSuite.uploadedBy,
-            uploadedAt: newSuite.uploadedAt,
-            fileName: newSuite.fileName
-          }
-        });
-
-        suites.unshift(newSuite);
-        targetSuiteId = newSuiteId;
-      } else {
-        targetSuiteId = newCaseSuiteId || selectedSuiteId;
-        if (!targetSuiteId) {
-          toast.error("Mohon pilih dokumen induk terlebih dahulu");
-          return;
-        }
-      }
-
       const newCaseId = `case-${Date.now()}`;
       const targetSuite = suites.find(s => s.id === targetSuiteId);
       const nextRowNum = targetSuite ? (targetSuite.cases.length + 1) : 1;
@@ -835,10 +821,13 @@ export function TestQAPanel({
         suiteId: targetSuiteId,
         rowNum: nextRowNum,
         title: newCaseTitle,
+        preConditions: newCasePreConditions,
+        testData: newCaseTestData,
         steps: newCaseSteps,
         expectedResult: newCaseExpected,
         status: "Pending",
         priority: newCasePriority,
+        assignedTo: newCaseAssignedTo || undefined,
         commentsList: [],
         evidences: []
       };
@@ -865,9 +854,11 @@ export function TestQAPanel({
       setNewCaseSteps("");
       setNewCaseExpected("");
       setNewCasePriority("Medium");
-      setNewCaseNewSuiteName("");
+      setNewCasePreConditions("");
+      setNewCaseTestData("");
+      setNewCaseAssignedTo("");
       setIsAddCaseOpen(false);
-      
+
       toast.dismiss();
       toast.success(`Test Case #${nextRowNum} berhasil disimpan ke database!`);
     } catch (err: any) {
@@ -886,10 +877,13 @@ export function TestQAPanel({
         suiteId: targetSuiteIdFallback,
         rowNum: nextRowNumFallback,
         title: newCaseTitle,
+        preConditions: newCasePreConditions,
+        testData: newCaseTestData,
         steps: newCaseSteps,
         expectedResult: newCaseExpected,
         status: "Pending",
         priority: newCasePriority,
+        assignedTo: newCaseAssignedTo || undefined,
         commentsList: [],
         evidences: []
       };
@@ -1501,6 +1495,7 @@ ${lastCommentText}
       phase: newSuitePhaseOnly,
       uploadedBy: currentUserUid,
       uploadedAt: new Date().toISOString(),
+      assignedTo: newSuiteAssignedTo || undefined,
       cases: []
     };
 
@@ -1510,6 +1505,7 @@ ${lastCommentText}
     setIsAddSuiteOpen(false);
     setNewSuiteNameOnly("");
     setNewSuitePhaseOnly("SIT");
+    setNewSuiteAssignedTo("");
 
     try {
       await apiFetch(`/api/projects/${selectedProject.id}/qa-test-suites`, {
@@ -1523,13 +1519,62 @@ ${lastCommentText}
     }
   };
 
+  const handleExportQAReport = () => {
+    const activeSuite = suites.find(s => s.id === selectedSuiteId);
+    if (!activeSuite) {
+      toast.error("Pilih modul/dokumen testing terlebih dahulu untuk diexport");
+      return;
+    }
+    const total = activeSuite.cases.length;
+    const passed = activeSuite.cases.filter(c => c.status === "Passed").length;
+    const failed = activeSuite.cases.filter(c => c.status === "Failed").length;
+    const blocked = activeSuite.cases.filter(c => c.status === "Blocked").length;
+    const pending = total - (passed + failed + blocked);
+    const passRate = total > 0 ? ((passed / total) * 100).toFixed(1) : "0";
+
+    const reportContent = `=== QA EXECUTION REPORT (ISTQB / IEEE 829 STANDARD) ===
+Project: ${selectedProject?.name || 'N/A'}
+Module / Suite: ${activeSuite.name}
+Phase: ${activeSuite.phase}
+Generated At: ${new Date().toLocaleString()}
+---------------------------------------------------------
+EXECUTIVE SUMMARY METRICS:
+- Total Test Cases: ${total}
+- Passed: ${passed} (${passRate}%)
+- Failed: ${failed}
+- Blocked: ${blocked}
+- Pending / Untested: ${pending}
+---------------------------------------------------------
+TEST CASE DETAILS & TRACEABILITY:
+${activeSuite.cases.map((c, i) => `${i+1}. [${c.status.toUpperCase()}] ${c.title} 
+   - Priority: ${c.priority || 'Medium'}
+   - Pre-conditions: ${c.preConditions || 'N/A'}
+   - Test Data: ${c.testData || 'N/A'}
+   - Expected: ${c.expectedResult}
+   ${c.linkedBugKey ? ` - Linked Bug: ${c.linkedBugKey}` : ''}`).join('\n\n')}
+=========================================================`;
+
+    const blob = new Blob([reportContent], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `QA_Execution_Report_${activeSuite.phase}_${activeSuite.name.replace(/[^a-zA-Z0-9]/g, '_')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Laporan Eksekusi QA berhasil di-export!");
+  };
+
   const submitEditSuite = async () => {
-    if (!suiteToEdit || !suiteEditName || suiteEditName.trim() === suiteToEdit.name) {
+    if (!suiteToEdit) {
       setSuiteToEdit(null);
       return;
     }
 
-    const updatedSuite = { ...suiteToEdit, name: suiteEditName.trim() };
+    const updatedSuite = { 
+      ...suiteToEdit, 
+      name: suiteEditName.trim() || suiteToEdit.name, 
+      assignedTo: suiteEditAssignedTo || undefined 
+    };
     const updatedSuites = suites.map(s => s.id === suiteToEdit.id ? updatedSuite : s);
     saveSuitesToStorage(updatedSuites);
 
@@ -1539,7 +1584,7 @@ ${lastCommentText}
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedSuite)
       });
-      toast.success("Nama Test Suite berhasil diubah.");
+      toast.success("Dokumen Test Suite berhasil diperbarui.");
     } catch (err) {
       console.warn("Failed to edit suite:", err);
     }
@@ -1547,12 +1592,20 @@ ${lastCommentText}
   };
 
   const submitEditTestCaseInfo = async () => {
-    if (!caseToEditInfo || !caseEditTitle || caseEditTitle.trim() === caseToEditInfo.title) {
+    if (!caseToEditInfo) {
       setCaseToEditInfo(null);
       return;
     }
 
-    const updatedTc = { ...caseToEditInfo, title: caseEditTitle.trim() };
+    const updatedTc = { 
+      ...caseToEditInfo, 
+      title: caseEditTitle.trim() || caseToEditInfo.title,
+      steps: caseEditSteps.trim() || caseToEditInfo.steps,
+      expectedResult: caseEditExpected.trim() || caseToEditInfo.expectedResult,
+      priority: caseEditPriority,
+      assignedTo: caseEditAssignedTo || undefined
+    };
+
     const updatedSuites = suites.map(suite => {
       if (suite.id !== caseToEditInfo.suiteId && suite.id !== selectedSuiteId) return suite;
       return {
@@ -1572,11 +1625,102 @@ ${lastCommentText}
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedTc)
       });
-      toast.success("Test Case berhasil diubah.");
+      toast.success("Test Case berhasil diperbarui (Judul, Langkah, Ekspektasi, Prioritas, & PIC).");
     } catch (err) {
       console.warn("Failed to edit test case:", err);
     }
     setCaseToEditInfo(null);
+  };
+
+  const handleMigrateSuitePhase = async () => {
+    if (!activeSuite) return;
+    const nextPhase = activeSuite.phase === "SIT" ? "UAT" : activeSuite.phase === "UAT" ? "PTR" : null;
+    if (!nextPhase) return;
+
+    const newSuiteName = `${activeSuite.name} (${nextPhase})`;
+    const newSuiteId = `suite-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const newSuite: QATestSuite = {
+      id: newSuiteId,
+      projectId: selectedProject.id,
+      name: newSuiteName,
+      phase: nextPhase,
+      uploadedBy: currentUserUid,
+      uploadedAt: new Date().toISOString(),
+      fileName: activeSuite.fileName || "Migrated_Suite",
+      assignedTo: activeSuite.assignedTo,
+      cases: activeSuite.cases.map((c, idx) => ({
+        ...c,
+        id: `tc-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 5)}`,
+        suiteId: newSuiteId,
+        status: "Pending", // Reset status for re-testing per QA Pro guidelines
+        commentsList: [],
+        evidences: []
+      }))
+    };
+
+    const updatedSuites = [newSuite, ...suites];
+    setSuites(updatedSuites);
+    saveSuitesToStorage(updatedSuites);
+    setSelectedSuiteId(newSuiteId);
+
+    toast.success(`Modul berhasil dimigrasi ke fase ${nextPhase}! Semua task dipindahkan dan status pengujian di-reset untuk eksekusi ulang.`);
+
+    try {
+      await apiFetch(`/api/projects/${selectedProject.id}/qa-test-suites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newSuite)
+      });
+    } catch (err) {
+      console.warn("Failed to save migrated suite to backend:", err);
+    }
+  };
+
+  const handleUpdateSuitePic = async (suiteId: string, assignedTo: string) => {
+    setActiveSuitePicDropdownId(null);
+    const updatedSuites = suites.map(s => s.id === suiteId ? { ...s, assignedTo: assignedTo || undefined } : s);
+    setSuites(updatedSuites);
+    saveSuitesToStorage(updatedSuites);
+    const targetSuite = updatedSuites.find(s => s.id === suiteId);
+    if (targetSuite) {
+      toast.success("PIC Modul berhasil diperbarui.");
+      try {
+        await apiFetch(`/api/projects/${selectedProject.id}/qa-test-suites/${suiteId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(targetSuite)
+        });
+      } catch (err) {
+        console.warn("Failed to update suite PIC:", err);
+      }
+    }
+  };
+
+  const handleUpdateCasePic = async (suiteId: string, caseId: string, assignedTo: string) => {
+    setActiveCasePicDropdownId(null);
+    const updatedSuites = suites.map(s => {
+      if (s.id !== suiteId) return s;
+      return {
+        ...s,
+        cases: s.cases.map(c => c.id === caseId ? { ...c, assignedTo: assignedTo || undefined } : c)
+      };
+    });
+    setSuites(updatedSuites);
+    saveSuitesToStorage(updatedSuites);
+    const targetSuite = updatedSuites.find(s => s.id === suiteId);
+    const targetCase = targetSuite?.cases.find(c => c.id === caseId);
+    if (targetCase) {
+      toast.success("PIC Task berhasil diperbarui.");
+      try {
+        await apiFetch(`/api/projects/${selectedProject.id}/qa-test-cases/${caseId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(targetCase)
+        });
+      } catch (err) {
+        console.warn("Failed to update test case PIC:", err);
+      }
+    }
   };
 
   // Filtered Cases
@@ -1697,49 +1841,40 @@ ${lastCommentText}
         {/* Left Sidebar: Document List & Drag Drop */}
         <div className="lg:col-span-4 space-y-6 lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto lg:sticky lg:top-4 pr-1 custom-scrollbar">
           
-          <div className="space-y-3">
-            <button
-              onClick={() => { setIsAddCaseOpen(true); setActiveAddTab("single"); }}
-              className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-sm hover:shadow-md transition-all active:scale-[0.98] cursor-pointer"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Upload / Tambah Dokumen</span>
-            </button>
-          </div>
+
 
           {/* Test Suites List Selector */}
           <div className="bg-white border border-slate-200/60 rounded-lg p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Daftar Dokumen Skrip</h3>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Daftar Modul Testing</h3>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsAddSuiteOpen(true)}
-                  className="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors cursor-pointer"
-                  title="Tambah Dokumen Skrip Manual"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
                 <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded-lg">
-                  {suitesForFilter.length} Dokumen
+                  {suitesForFilter.length} Modul
                 </span>
               </div>
             </div>
 
-            {/* Phase Filters */}
-            <div className="grid grid-cols-4 gap-1 p-1 bg-slate-50 border border-slate-200/30 rounded-xl text-[10px] font-black uppercase tracking-wider">
-              {["ALL", "SIT", "UAT", "PTR"].map((ph) => (
-                <button
-                  key={ph}
-                  onClick={() => setPhaseFilter(ph as any)}
-                  className={`py-1.5 rounded-lg text-center transition-all cursor-pointer ${
-                    phaseFilter === ph 
-                      ? "bg-indigo-600 text-white shadow-sm" 
-                      : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                  }`}
+            {/* Phase Filters Dropdown & Add Suite Button */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <select
+                  value={phaseFilter}
+                  onChange={(e) => setPhaseFilter(e.target.value as any)}
+                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
                 >
-                  {ph}
-                </button>
-              ))}
+                  <option value="ALL">Semua Fase (ALL)</option>
+                  <option value="SIT">Fase SIT (System Integration Test)</option>
+                  <option value="UAT">Fase UAT (User Acceptance Test)</option>
+                  <option value="PTR">Fase PTR (Production Readiness Test)</option>
+                </select>
+              </div>
+              <button
+                onClick={() => setIsAddSuiteOpen(true)}
+                className="p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center cursor-pointer shrink-0"
+                title="Tambah Modul Testing Baru"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Suite Items */}
@@ -1768,9 +1903,9 @@ ${lastCommentText}
                       {/* Action icons */}
                       <div className="absolute top-3 right-3 flex items-center gap-1">
                         <button
-                          onClick={(e) => { e.stopPropagation(); setSuiteToEdit(suite); setSuiteEditName(suite.name); }}
+                          onClick={(e) => { e.stopPropagation(); setSuiteToEdit(suite); setSuiteEditName(suite.name); setSuiteEditAssignedTo(suite.assignedTo || ""); }}
                           className="text-slate-400 hover:text-indigo-500 transition-opacity p-1 bg-white hover:bg-indigo-50 rounded-lg shadow-sm border border-slate-100"
-                          title="Ubah Nama Dokumen"
+                          title="Ubah Dokumen & PIC"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
@@ -1800,12 +1935,61 @@ ${lastCommentText}
                         {suite.name}
                       </h4>
 
-                      <div className="mt-3 flex items-center justify-between text-[10px] font-black text-slate-500">
+                      <div className="mt-3 flex items-center justify-between text-[10px] font-black text-slate-500 pt-2 border-t border-slate-100">
                         <span className="flex items-center gap-1">
                           <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
                           {suite.fileName || "Imported_Script"}
                         </span>
-                        <span>{passed}/{total} Passed</span>
+                        <div className="relative">
+                          <div 
+                            onClick={(e) => { e.stopPropagation(); setActiveSuitePicDropdownId(activeSuitePicDropdownId === suite.id ? null : suite.id); }}
+                            className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200/60 shrink-0 cursor-pointer transition-colors"
+                            title="Klik untuk ubah PIC Modul"
+                          >
+                            {suite.assignedTo ? (
+                              <>
+                                <UserAvatar uid={suite.assignedTo} members={projectMembers} className="w-4 h-4" />
+                                <span className="text-[10px] font-bold text-slate-600 truncate max-w-[80px]">
+                                  {(projectMembers || []).find((m:any) => (m.uid || m.id) === suite.assignedTo)?.displayName?.split(' ')[0] || 'PIC'}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-black rounded">All PIC</span>
+                            )}
+                          </div>
+
+                          {activeSuitePicDropdownId === suite.id && (
+                            <div className="absolute right-0 bottom-full mb-1 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50">
+                              <div className="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
+                                Pilih PIC Modul (Project)
+                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleUpdateSuitePic(suite.id, ""); }}
+                                className={`w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex items-center justify-between ${!suite.assignedTo ? 'bg-indigo-50/50 text-indigo-600' : 'text-slate-700'}`}
+                              >
+                                <span>All PIC (Semua)</span>
+                               {!suite.assignedTo && <CheckCircle2 className="w-3.5 h-3.5" />}
+                              </button>
+                              {(projectMembers || []).map((m: any) => {
+                                const mId = m.uid || m.id;
+                                const isSelected = suite.assignedTo === mId;
+                                return (
+                                  <button
+                                    key={mId}
+                                    onClick={(e) => { e.stopPropagation(); handleUpdateSuitePic(suite.id, mId); }}
+                                    className={`w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex items-center justify-between gap-2 ${isSelected ? 'bg-indigo-50/50 text-indigo-600' : 'text-slate-700'}`}
+                                  >
+                                    <div className="flex items-center gap-2 truncate">
+                                      <UserAvatar uid={mId} members={projectMembers} className="w-4 h-4 shrink-0" />
+                                      <span className="truncate">{m.displayName || m.email || m.username}</span>
+                                    </div>
+                                    {isSelected && <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* Micro progress bar */}
@@ -2057,6 +2241,13 @@ ${lastCommentText}
                     </span>
                   )}
                   <button
+                    onClick={() => { setIsAddCaseOpen(true); setActiveAddTab("single"); }}
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Upload / Tambah Dokumen</span>
+                  </button>
+                  <button
                     onClick={handleGenerateWithAi}
                     disabled={isGeneratingAi}
                     className="px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:opacity-50 text-white font-black rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-[0.98] cursor-pointer"
@@ -2065,6 +2256,24 @@ ${lastCommentText}
                     <Sparkles className={`w-4 h-4 ${isGeneratingAi ? 'animate-spin' : ''}`} />
                     <span>{isGeneratingAi ? "Menganalisis..." : "Generate AI"}</span>
                   </button>
+                  <button
+                    onClick={handleExportQAReport}
+                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                    title="Export Laporan Eksekusi QA (ISTQB / IEEE 829 Standard)"
+                  >
+                    <Download className="w-4 h-4 text-indigo-600" />
+                    <span>Export Report</span>
+                  </button>
+                  {passedPercent === 100 && totalCasesCount > 0 && (activeSuite.phase === "SIT" || activeSuite.phase === "UAT") && (
+                    <button
+                      onClick={handleMigrateSuitePhase}
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+                      title={activeSuite.phase === "SIT" ? "Migrasi modul ke UAT (Semua task 100% Passed)" : "Migrasi modul ke PTR (Semua task 100% Passed)"}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>{activeSuite.phase === "SIT" ? "Migrate to UAT" : "Migrate to PTR"}</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2137,8 +2346,11 @@ ${lastCommentText}
                     </div>
                   ) : (
                     filteredCases.map((tc, idx) => (
-                      <div 
+                      <motion.div 
                         key={tc.id ? `${tc.id}-${idx}` : `tc-${idx}`} 
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, delay: idx * 0.03 }}
                         onClick={() => setSelectedTestCase(tc)}
                         className={`p-3.5 md:p-4 rounded-xl border transition-all hover:bg-slate-50 hover:border-indigo-400 hover:shadow-md cursor-pointer select-none group border-l-4 relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
                           tc.status === "Passed" ? "bg-white border-slate-200 border-l-emerald-500 hover:border-l-emerald-600" :
@@ -2165,6 +2377,58 @@ ${lastCommentText}
                               {tc.priority}
                             </span>
                           )}
+
+                          {/* Assigned PIC Avatar / Badge */}
+                          <div className="relative">
+                            <div 
+                              onClick={(e) => { e.stopPropagation(); setActiveCasePicDropdownId(activeCasePicDropdownId === tc.id ? null : tc.id); }}
+                              className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200/60 shrink-0 cursor-pointer transition-colors"
+                              title="Klik untuk ubah PIC Task"
+                            >
+                              {tc.assignedTo ? (
+                                <>
+                                  <UserAvatar uid={tc.assignedTo} members={projectMembers} className="w-4 h-4" />
+                                  <span className="text-[9px] font-bold text-slate-600 hidden sm:inline">
+                                    {(projectMembers || []).find((m:any) => (m.uid || m.id) === tc.assignedTo)?.displayName?.split(' ')[0] || 'PIC'}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-[9px] font-bold text-slate-500">All PIC</span>
+                              )}
+                            </div>
+
+                            {activeCasePicDropdownId === tc.id && (
+                              <div className="absolute left-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50">
+                                <div className="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
+                                  Pilih PIC Task (Project)
+                                </div>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleUpdateCasePic(activeSuite!.id, tc.id, ""); }}
+                                  className={`w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex items-center justify-between ${!tc.assignedTo ? 'bg-indigo-50/50 text-indigo-600' : 'text-slate-700'}`}
+                                >
+                                  <span>All PIC (Ikuti Modul)</span>
+                                  {!tc.assignedTo && <CheckCircle2 className="w-3.5 h-3.5" />}
+                                </button>
+                                {(projectMembers || []).map((m: any) => {
+                                  const mId = m.uid || m.id;
+                                  const isSelected = tc.assignedTo === mId;
+                                  return (
+                                    <button
+                                      key={mId}
+                                      onClick={(e) => { e.stopPropagation(); handleUpdateCasePic(activeSuite!.id, tc.id, mId); }}
+                                      className={`w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex items-center justify-between gap-2 ${isSelected ? 'bg-indigo-50/50 text-indigo-600' : 'text-slate-700'}`}
+                                    >
+                                      <div className="flex items-center gap-2 truncate">
+                                        <UserAvatar uid={mId} members={projectMembers} className="w-4 h-4 shrink-0" />
+                                        <span className="truncate">{m.displayName || m.email || m.username}</span>
+                                      </div>
+                                      {isSelected && <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         {/* Right Section: Small Indicators & Action Dropdowns */}
@@ -2246,9 +2510,17 @@ ${lastCommentText}
                           {/* Quick Action buttons */}
                           <div className="flex items-center gap-0.5 border-l border-slate-200 pl-1.5 ml-0.5">
                             <button
-                              onClick={(e) => { e.stopPropagation(); setCaseToEditInfo(tc); setCaseEditTitle(tc.title); }}
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setCaseToEditInfo(tc); 
+                                setCaseEditTitle(tc.title); 
+                                setCaseEditSteps(tc.steps || ""); 
+                                setCaseEditExpected(tc.expectedResult || ""); 
+                                setCaseEditPriority(tc.priority || "Medium"); 
+                                setCaseEditAssignedTo(tc.assignedTo || ""); 
+                              }}
                               className="text-slate-400 hover:text-indigo-600 transition-colors p-1 hover:bg-indigo-50 rounded-lg cursor-pointer"
-                              title="Ubah Judul Test Case"
+                              title="Ubah Test Case (Langkah & Ekspektasi)"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
@@ -2261,7 +2533,7 @@ ${lastCommentText}
                             </button>
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
                     ))
                   )}
 
@@ -3107,6 +3379,22 @@ ${lastCommentText}
                   </select>
                 </div>
 
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-700 font-bold block">Assignee PIC Modul</label>
+                  <select
+                    value={newSuiteAssignedTo}
+                    onChange={(e) => setNewSuiteAssignedTo(e.target.value)}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#405189] focus:outline-none focus:ring-1 focus:ring-[#405189]/20 font-semibold text-slate-800"
+                  >
+                    <option value="">Semua PIC (All PIC / Unassigned)</option>
+                    {(projectMembers || []).map((m: any) => (
+                      <option key={m.uid || m.id} value={m.uid || m.id}>
+                        {m.displayName || m.email || m.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="flex justify-end gap-2 pt-4">
                   <button
                     type="button"
@@ -3140,11 +3428,8 @@ ${lastCommentText}
             >
               <div className="flex justify-between items-center pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-xl">
-                    <Plus className="w-5 h-5" />
-                  </span>
                   <h3 className="text-base font-black text-slate-800">
-                    ➕ Add New Test Case
+                    Add New Test Case
                   </h3>
                 </div>
                 <button
@@ -3182,76 +3467,28 @@ ${lastCommentText}
                 </button>
               </div>
 
+              {/* Active Module Banner */}
+              {(() => {
+                const activeSuite = suites.find(s => s.id === selectedSuiteId);
+                return (
+                  <div className="bg-indigo-50/60 border border-indigo-100 px-4 py-2.5 rounded-xl flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-indigo-600 text-white font-black rounded-md text-[10px]">
+                        {activeSuite ? activeSuite.phase : "MODUL"}
+                      </span>
+                      <span className="font-bold text-slate-800">
+                        Modul Target: {activeSuite ? activeSuite.name : "Belum ada modul yang dipilih"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {activeAddTab === "single" ? (
                 <form onSubmit={handleCreateManualTestCase} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-h-[calc(100vh-300px)] overflow-y-auto pr-1 custom-scrollbar">
                     {/* Left Side: Metadata */}
                     <div className="space-y-4">
-                      {/* Dokumen Induk (SIT/UAT/PTR) Selector */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Dokumen Induk / Test Suite *</label>
-                        
-                        {/* Selector of Option */}
-                        <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 border border-slate-200/50 rounded-xl text-xs font-bold">
-                          <button
-                            type="button"
-                            onClick={() => setNewCaseSuiteOption("existing")}
-                            className={`py-1.5 rounded-lg text-center transition-all cursor-pointer ${
-                              newCaseSuiteOption === "existing"
-                                ? "bg-white text-slate-800 shadow-xs"
-                                : "text-slate-400 hover:text-slate-600"
-                            }`}
-                          >
-                            Pilih Dokumen Aktif
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNewCaseSuiteOption("new")}
-                            className={`py-1.5 rounded-lg text-center transition-all cursor-pointer ${
-                              newCaseSuiteOption === "new"
-                                ? "bg-white text-slate-800 shadow-xs"
-                                : "text-slate-400 hover:text-slate-600"
-                            }`}
-                          >
-                            Buat Dokumen Baru
-                          </button>
-                        </div>
-
-                        {newCaseSuiteOption === "existing" ? (
-                          <select
-                            value={newCaseSuiteId}
-                            onChange={(e) => setNewCaseSuiteId(e.target.value)}
-                            className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none font-bold"
-                          >
-                            <option value="">-- Pilih Dokumen Skrip --</option>
-                            {suites.map((s, idx) => (
-                              <option key={s.id ? `nc-cs-${s.id}-${idx}` : `nc-cs-${idx}`} value={s.id}>
-                                [{s.phase}] {s.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                            <input
-                              type="text"
-                              placeholder="Nama Dokumen Baru (misal: SIT - Auth Core)"
-                              value={newCaseNewSuiteName}
-                              onChange={(e) => setNewCaseNewSuiteName(e.target.value)}
-                              className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none font-bold md:col-span-2"
-                            />
-                            <select
-                              value={newCaseNewSuitePhase}
-                              onChange={(e) => setNewCaseNewSuitePhase(e.target.value as any)}
-                              className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none font-black text-indigo-700"
-                            >
-                              <option value="SIT">Fase SIT</option>
-                              <option value="UAT">Fase UAT</option>
-                              <option value="PTR">Fase PTR</option>
-                            </select>
-                          </div>
-                        )}
-                      </div>
-
                       {/* Judul Test Case */}
                       <div className="space-y-1.5">
                         <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Judul Test Case *</label>
@@ -3268,25 +3505,33 @@ ${lastCommentText}
                       {/* Tingkat Prioritas */}
                       <div className="space-y-1.5">
                         <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Tingkat Prioritas *</label>
-                        <div className="grid grid-cols-4 gap-2 text-xs font-black uppercase tracking-wider">
-                          {(["Low", "Medium", "High", "Critical"] as const).map((pr) => (
-                            <button
-                              key={pr}
-                              type="button"
-                              onClick={() => setNewCasePriority(pr)}
-                              className={`py-1.5 rounded-xl border text-center transition-all cursor-pointer ${
-                                newCasePriority === pr
-                                  ? pr === "Critical" ? "bg-red-600 text-white border-red-600" :
-                                    pr === "High" ? "bg-orange-500 text-white border-orange-500" :
-                                    pr === "Medium" ? "bg-amber-500 text-white border-amber-500" :
-                                    "bg-slate-500 text-white border-slate-500"
-                                  : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-                              }`}
-                            >
-                              {pr}
-                            </button>
+                        <select
+                          value={newCasePriority}
+                          onChange={(e) => setNewCasePriority(e.target.value as any)}
+                          className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none font-bold text-slate-700 cursor-pointer"
+                        >
+                          <option value="Low">Low Priority</option>
+                          <option value="Medium">Medium Priority</option>
+                          <option value="High">High Priority</option>
+                          <option value="Critical">Critical Priority</option>
+                        </select>
+                      </div>
+
+                      {/* Assignee PIC Task */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Assignee PIC Task</label>
+                        <select
+                          value={newCaseAssignedTo}
+                          onChange={(e) => setNewCaseAssignedTo(e.target.value)}
+                          className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none font-bold text-slate-700 cursor-pointer"
+                        >
+                          <option value="">Ikuti Modul / Semua PIC (All PIC)</option>
+                          {(projectMembers || []).map((m: any) => (
+                            <option key={m.uid || m.id} value={m.uid || m.id}>
+                              {m.displayName || m.email || m.username}
+                            </option>
                           ))}
-                        </div>
+                        </select>
                       </div>
                     </div>
 
@@ -3339,19 +3584,6 @@ ${lastCommentText}
                 </form>
               ) : (
                 <form onSubmit={handleBulkUploadTestCases} className="space-y-6">
-                  {/* Phase Dropdown */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Pilih Fase Testing *</label>
-                    <select
-                      value={bulkUploadPhase}
-                      onChange={(e) => setBulkUploadPhase(e.target.value as any)}
-                      className="w-full text-xs p-3 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none font-black text-indigo-700"
-                    >
-                      <option value="SIT">Fase SIT (System Integration Testing)</option>
-                      <option value="UAT">Fase UAT (User Acceptance Testing)</option>
-                      <option value="PTR">Fase PTR (Production Trial Run)</option>
-                    </select>
-                  </div>
 
                   {/* Info Box & Template */}
                   <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl flex flex-col items-start gap-3">
@@ -3369,7 +3601,7 @@ ${lastCommentText}
                         </span>
                       ))}
                     </div>
-                    <a href="#" onClick={(e) => { e.preventDefault(); toast.info("Mengunduh template..."); }} className="inline-flex items-center gap-1.5 mt-1 text-xs font-black text-indigo-600 hover:text-indigo-800 transition-colors">
+                    <a href="#" onClick={(e) => { e.preventDefault(); toast.info("Mengunduh template excel..."); }} className="inline-flex items-center gap-1.5 mt-1 text-xs font-black text-indigo-600 hover:text-indigo-800 transition-colors">
                       <Download className="w-4 h-4" /> Download Template Excel
                     </a>
                   </div>
@@ -3523,16 +3755,34 @@ ${lastCommentText}
                 <div className="w-7 h-7 rounded-lg bg-[#405189]/10 text-[#405189] flex items-center justify-center">
                   <Edit3 className="w-4 h-4" />
                 </div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">Ubah Nama Dokumen</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">Ubah Dokumen & PIC</h3>
               </div>
-              <input
-                autoFocus
-                type="text"
-                value={suiteEditName}
-                onChange={(e) => setSuiteEditName(e.target.value)}
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#405189] focus:outline-none focus:ring-1 focus:ring-[#405189]/20 font-medium text-slate-800"
-                placeholder="Masukkan nama dokumen..."
-              />
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-slate-700 font-bold block">Nama Dokumen</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={suiteEditName}
+                  onChange={(e) => setSuiteEditName(e.target.value)}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#405189] focus:outline-none focus:ring-1 focus:ring-[#405189]/20 font-medium text-slate-800"
+                  placeholder="Masukkan nama dokumen..."
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-slate-700 font-bold block">Assignee PIC Modul</label>
+                <select
+                  value={suiteEditAssignedTo}
+                  onChange={(e) => setSuiteEditAssignedTo(e.target.value)}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#405189] focus:outline-none focus:ring-1 focus:ring-[#405189]/20 font-semibold text-slate-800"
+                >
+                  <option value="">Semua PIC (All PIC / Unassigned)</option>
+                  {(projectMembers || []).map((m: any) => (
+                    <option key={m.uid || m.id} value={m.uid || m.id}>
+                      {m.displayName || m.email || m.username}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex justify-end gap-2 pt-3">
                 <button
                   onClick={() => setSuiteToEdit(null)}
@@ -3560,34 +3810,94 @@ ${lastCommentText}
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white border border-slate-200 rounded-xl p-6 max-w-sm w-full shadow-xl space-y-4"
+              className="bg-white border border-slate-200 rounded-xl p-6 max-w-lg w-full shadow-xl space-y-4 max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center gap-2 text-slate-800 mb-2">
-                <div className="w-7 h-7 rounded-lg bg-[#405189]/10 text-[#405189] flex items-center justify-center">
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
                   <Edit3 className="w-4 h-4" />
                 </div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">Ubah Judul Test Case</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">Ubah Test Case (Langkah & Ekspektasi)</h3>
               </div>
-              <input
-                autoFocus
-                type="text"
-                value={caseEditTitle}
-                onChange={(e) => setCaseEditTitle(e.target.value)}
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#405189] focus:outline-none focus:ring-1 focus:ring-[#405189]/20 font-medium text-slate-800"
-                placeholder="Masukkan judul test case..."
-              />
-              <div className="flex justify-end gap-2 pt-3">
+
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Judul Test Case *</label>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={caseEditTitle}
+                    onChange={(e) => setCaseEditTitle(e.target.value)}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none font-bold text-slate-800"
+                    placeholder="Masukkan judul test case..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Tingkat Prioritas</label>
+                    <select
+                      value={caseEditPriority}
+                      onChange={(e) => setCaseEditPriority(e.target.value as any)}
+                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none font-bold text-slate-700 cursor-pointer"
+                    >
+                      <option value="Low">Low Priority</option>
+                      <option value="Medium">Medium Priority</option>
+                      <option value="High">High Priority</option>
+                      <option value="Critical">Critical Priority</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Assignee PIC Task</label>
+                    <select
+                      value={caseEditAssignedTo}
+                      onChange={(e) => setCaseEditAssignedTo(e.target.value)}
+                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none font-bold text-slate-700 cursor-pointer"
+                    >
+                      <option value="">Ikuti Modul / Semua PIC</option>
+                      {(projectMembers || []).map((m: any) => (
+                        <option key={m.uid || m.id} value={m.uid || m.id}>
+                          {m.displayName || m.email || m.username}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Langkah Pengujian *</label>
+                  <textarea
+                    rows={4}
+                    value={caseEditSteps}
+                    onChange={(e) => setCaseEditSteps(e.target.value)}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none font-medium text-slate-800"
+                    placeholder="Langkah-langkah pengujian..."
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Hasil yang Diharapkan *</label>
+                  <textarea
+                    rows={3}
+                    value={caseEditExpected}
+                    onChange={(e) => setCaseEditExpected(e.target.value)}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none font-medium text-slate-800"
+                    placeholder="Hasil yang diharapkan..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   onClick={() => setCaseToEditInfo(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-black uppercase tracking-wider rounded-xl transition-all"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   onClick={submitEditTestCaseInfo}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-sm"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-sm cursor-pointer"
                 >
-                  Simpan
+                  Simpan Perubahan
                 </button>
               </div>
             </motion.div>

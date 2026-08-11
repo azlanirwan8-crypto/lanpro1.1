@@ -109,7 +109,8 @@ export function convertToPostgres(sql: string, params: any[] = []): { text: stri
     'photoURL', 'fileType', 'fileSize', 'startDate', 'endDate', 'acceptanceCriteria', 'meetingLink',
     'dropdownOptions', 'fieldType', 'fileData', 'scheduledAt',
   ];
-  for (const col of camelCaseCols) {
+  const sortedCamelCaseCols = [...camelCaseCols].sort((a, b) => b.length - a.length);
+  for (const col of sortedCamelCaseCols) {
     const re = new RegExp('(?<!"\\.)\\b' + col + '\\b(?!")', 'g');
     text = text.replace(re, '"' + col + '"');
   }

@@ -17,6 +17,8 @@ export interface QATestCase {
   suiteId: string;
   rowNum: number;
   title: string;
+  preConditions?: string;
+  testData?: string;
   steps: string;
   expectedResult: string;
   status: "Passed" | "Failed" | "Blocked" | "Retest" | "Pending";
@@ -56,5 +58,6 @@ export interface QATestSuite {
   uploadedBy: string;
   uploadedAt: string;
   fileName?: string;
+  assignedTo?: string;
   cases: QATestCase[];
 }

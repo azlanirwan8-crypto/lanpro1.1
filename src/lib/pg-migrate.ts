@@ -259,24 +259,28 @@ export async function runMigrations(pool: Pool): Promise<void> {
     // ── ActivityLogs ─────────────────────────────────────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS "ActivityLogs" (
-        id          VARCHAR(36) PRIMARY KEY,
-        "taskId"    VARCHAR(36),
-        "projectId" VARCHAR(36),
-        "userId"    VARCHAR(36),
+        id          VARCHAR(255) PRIMARY KEY,
+        "taskId"    VARCHAR(255),
+        "projectId" VARCHAR(255),
+        "userId"    VARCHAR(255),
         action      VARCHAR(255) NOT NULL,
         details     TEXT,
         "createdAt" TIMESTAMP DEFAULT NOW()
       );
+      ALTER TABLE "ActivityLogs" ALTER COLUMN id TYPE VARCHAR(255);
+      ALTER TABLE "ActivityLogs" ALTER COLUMN "taskId" TYPE VARCHAR(255);
+      ALTER TABLE "ActivityLogs" ALTER COLUMN "projectId" TYPE VARCHAR(255);
+      ALTER TABLE "ActivityLogs" ALTER COLUMN "userId" TYPE VARCHAR(255);
     `);
 
     // ── AuditLogs ────────────────────────────────────────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS "AuditLogs" (
-        id           VARCHAR(36) PRIMARY KEY,
-        "userId"     VARCHAR(36),
-        "projectId"  VARCHAR(36),
+        id           VARCHAR(255) PRIMARY KEY,
+        "userId"     VARCHAR(255),
+        "projectId"  VARCHAR(255),
         "entityName" VARCHAR(100),
-        "entityId"   VARCHAR(36),
+        "entityId"   VARCHAR(255),
         "actionType" VARCHAR(50),
         changes      JSONB,
         "oldValues"  JSONB,
@@ -287,6 +291,10 @@ export async function runMigrations(pool: Pool): Promise<void> {
       );
       ALTER TABLE "AuditLogs" ADD COLUMN IF NOT EXISTS "oldValues" JSONB;
       ALTER TABLE "AuditLogs" ADD COLUMN IF NOT EXISTS "newValues" JSONB;
+      ALTER TABLE "AuditLogs" ALTER COLUMN id TYPE VARCHAR(255);
+      ALTER TABLE "AuditLogs" ALTER COLUMN "userId" TYPE VARCHAR(255);
+      ALTER TABLE "AuditLogs" ALTER COLUMN "projectId" TYPE VARCHAR(255);
+      ALTER TABLE "AuditLogs" ALTER COLUMN "entityId" TYPE VARCHAR(255);
     `);
 
     // ── Messages ─────────────────────────────────────────────────────────────
@@ -443,7 +451,8 @@ export async function runMigrations(pool: Pool): Promise<void> {
     await client.query(`
       CREATE TABLE IF NOT EXISTS "QATestCaseExecutionLogs" (
         id                  VARCHAR(36) PRIMARY KEY,
-        "testCaseId"        VARCHAR(36) NOT NULL,
+        "testCaseId"        VARCHAR(36),
+        "caseId"            VARCHAR(36),
         "projectId"         VARCHAR(36) NOT NULL,
         "runVersion"        INT NOT NULL DEFAULT 1,
         "runLabel"          VARCHAR(50) NOT NULL,
@@ -455,6 +464,8 @@ export async function runMigrations(pool: Pool): Promise<void> {
         notes               TEXT,
         evidences           JSONB
       );
+      ALTER TABLE "QATestCaseExecutionLogs" ADD COLUMN IF NOT EXISTS "testCaseId" VARCHAR(36);
+      ALTER TABLE "QATestCaseExecutionLogs" ADD COLUMN IF NOT EXISTS "caseId" VARCHAR(36);
     `);
 
     // ── ProjectModules ────────────────────────────────────────────────────────

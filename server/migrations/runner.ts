@@ -1,6 +1,7 @@
 import mysqlPool from '../../src/lib/db';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { hashPassword } from '../helpers/hash';
 
 export async function runMigrations() {
   // --- AUTO MIGRATION: DATABASE SCHEMAS ---

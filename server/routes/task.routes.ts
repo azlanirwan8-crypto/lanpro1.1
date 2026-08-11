@@ -4,11 +4,40 @@ import mysqlPool from "../../src/lib/db";
 import { authenticateJWT } from "../middleware/auth";
 import { verifyProjectAccess } from "../middleware/rbac";
 import { createAuditLog } from "../services/audit.service";
-import { broadcastProjectNotification, sendProjectActivityNotification, checkUpcomingDueDates } from "../services/notification.service";
+import { broadcastProjectNotification, sendProjectActivityNotification, checkUpcomingDueDates, createAutomatedNotification } from "../services/notification.service";
+import { optimisticLockingConflicts } from "../config/metrics";
 import { GoogleGenAI, Type } from "@google/genai";
 import xss from "xss";
 
 const router = express.Router();
+
+async function recordExecutionRunLog(
+  connection: any,
+  projectId: string,
+  caseId: string,
+  executionStatus: string,
+  linkedIssueKey: string,
+  executedByUserId: string,
+  executedByName: string,
+  evaluationNotes: string,
+  evidences: any[]
+) {
+  const logId = crypto.randomUUID();
+  await connection.query(
+    `INSERT INTO QATestCaseExecutionLogs (id, projectId, caseId, executionStatus, linkedIssueKey, executedByUserId, executedByName, evaluationNotes, evidences)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [logId, projectId, caseId, executionStatus, linkedIssueKey, executedByUserId, executedByName, evaluationNotes, JSON.stringify(evidences || [])]
+  );
+}
+
+async function generateContentWithFallback(ai: any, options: any) {
+  try {
+    return await ai.models.generateContent(options);
+  } catch (err) {
+    const fallbackOptions = { ...options, model: 'gemini-2.5-flash' };
+    return await ai.models.generateContent(fallbackOptions);
+  }
+}
 
   router.get("/api/projects/:projectId/tasks", verifyProjectAccess(['*']), async (req: any, res) => {
     let connection;
@@ -266,7 +295,10 @@ const router = express.Router();
       await connection.commit();
       connection.release();
       
-      io.to(projectId).emit("project_updated", { type: "tasks_reordered", projectId });
+      const io = req.app.get('io');
+      if (io) {
+        io.to(projectId).emit("project_updated", { type: "tasks_reordered", projectId });
+      }
       res.json({ status: "success", message: "Tasks reordered successfully" });
     } catch (error: any) {
       if (connection) {
@@ -625,21 +657,24 @@ function checkUserPermissionBackend(role: string, customPermissions: any, action
         await createAuditLog(userId as string, projectId, 'UPDATE', 'Tasks', id, oldTask, newValues);
 
         // 3. Broadcast real-time update (Socket.io Delta Update)
-        io.to(projectId).emit("task_updated", {
-          taskId: id,
-          projectId,
-          changes: changedFields,
-          updatedBy: userId
-        });
-
-        // Special TASK_MOVE broadcast if status changed
-        if (changedFields.status) {
-          io.to(projectId).emit("TASK_MOVE", {
+        const io = req.app.get('io');
+        if (io) {
+          io.to(projectId).emit("task_updated", {
             taskId: id,
-            oldStatus: oldTask.status,
-            newStatus: changedFields.status,
+            projectId,
+            changes: changedFields,
             updatedBy: userId
           });
+
+          // Special TASK_MOVE broadcast if status changed
+          if (changedFields.status) {
+            io.to(projectId).emit("TASK_MOVE", {
+              taskId: id,
+              oldStatus: oldTask.status,
+              newStatus: changedFields.status,
+              updatedBy: userId
+            });
+          }
         }
 
         // 4. Automated notifications for Blocked task status or isBlocked flag changes
@@ -707,12 +742,15 @@ function checkUserPermissionBackend(role: string, customPermissions: any, action
               }
 
               // Real-time Socket.io broadcast
-              io.to(projectId).emit("QA_TESTCASE_UPDATED", {
-                testCaseId: tc.id,
-                projectId,
-                status: "Retest",
-                linkedBugKey: taskKey
-              });
+              const io = req.app.get('io');
+              if (io) {
+                io.to(projectId).emit("QA_TESTCASE_UPDATED", {
+                  testCaseId: tc.id,
+                  projectId,
+                  status: "Retest",
+                  linkedBugKey: taskKey
+                });
+              }
             }
           }
         }

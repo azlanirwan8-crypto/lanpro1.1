@@ -1,7 +1,39 @@
 import crypto from "crypto";
 import mysqlPool from "../../src/lib/db";
 
-export const createAutomatedNotification = async (io: any, recipientId: string, senderId: string | null, title: string, message: string, type: string, relatedId: string | null) => {
+export const createAutomatedNotification = async (
+  arg1: any,
+  arg2: any,
+  arg3: any,
+  arg4: any,
+  arg5: any,
+  arg6: any,
+  arg7?: any
+) => {
+  let io: any = null;
+  let recipientId: string;
+  let senderId: string | null;
+  let title: string;
+  let message: string;
+  let type: string;
+  let relatedId: string | null;
+
+  if (arg7 !== undefined) {
+    io = arg1;
+    recipientId = arg2;
+    senderId = arg3;
+    title = arg4;
+    message = arg5;
+    type = arg6;
+    relatedId = arg7;
+  } else {
+    recipientId = arg1;
+    senderId = arg2;
+    title = arg3;
+    message = arg4;
+    type = arg5;
+    relatedId = arg6;
+  }
   let conn;
   try {
     conn = await mysqlPool.getConnection();
@@ -30,7 +62,39 @@ export const createAutomatedNotification = async (io: any, recipientId: string, 
   }
 };
 
-export const broadcastProjectNotification = async (io: any, projectId: string, senderId: string | null, title: string, message: string, type: string, relatedId: string | null) => {
+export const broadcastProjectNotification = async (
+  arg1: any,
+  arg2: any,
+  arg3: any,
+  arg4: any,
+  arg5: any,
+  arg6: any,
+  arg7?: any
+) => {
+  let io: any = null;
+  let projectId: string;
+  let senderId: string | null;
+  let title: string;
+  let message: string;
+  let type: string;
+  let relatedId: string | null;
+
+  if (arg7 !== undefined) {
+    io = arg1;
+    projectId = arg2;
+    senderId = arg3;
+    title = arg4;
+    message = arg5;
+    type = arg6;
+    relatedId = arg7;
+  } else {
+    projectId = arg1;
+    senderId = arg2;
+    title = arg3;
+    message = arg4;
+    type = arg5;
+    relatedId = arg6 || null;
+  }
   let conn;
   try {
     conn = await mysqlPool.getConnection();
@@ -72,7 +136,31 @@ export const broadcastProjectNotification = async (io: any, projectId: string, s
   }
 };
 
-export const sendProjectActivityNotification = async (io: any, projectId: string, triggerUserId: string, actionType: 'create_task' | 'update_task' | 'comment_task', payload: any) => {
+export const sendProjectActivityNotification = async (
+  arg1: any,
+  arg2: any,
+  arg3: any,
+  arg4: any,
+  arg5?: any
+) => {
+  let io: any = null;
+  let projectId: string;
+  let triggerUserId: string;
+  let actionType: 'create_task' | 'update_task' | 'comment_task';
+  let payload: any;
+
+  if (arg5 !== undefined) {
+    io = arg1;
+    projectId = arg2;
+    triggerUserId = arg3;
+    actionType = arg4;
+    payload = arg5;
+  } else {
+    projectId = arg1;
+    triggerUserId = arg2;
+    actionType = arg3;
+    payload = arg4;
+  }
   let conn;
   try {
     conn = await mysqlPool.getConnection();
@@ -167,7 +255,7 @@ export const sendProjectActivityNotification = async (io: any, projectId: string
   }
 };
 
-export const checkUpcomingDueDates = async (io: any) => {
+export const checkUpcomingDueDates = async (io: any = null) => {
   let connection;
   try {
     connection = await mysqlPool.getConnection();
