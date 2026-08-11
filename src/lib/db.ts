@@ -49,7 +49,10 @@ export function convertToPostgres(sql: string, params: any[] = []): { text: stri
   // 1. Replace backtick-quoted identifiers with double-quote
   let text = sql.replace(/`([^`]+)`/g, '"$1"');
 
-  // 2. Replace ? placeholders with $1, $2, ...
+  // 2. Convert IN (?) to = ANY(?) for PostgreSQL array parameters compatibility
+  text = text.replace(/\bIN\s*\(\s*\?\s*\)/gi, '= ANY(?)');
+
+  // 3. Replace ? placeholders with $1, $2, ...
   let idx = 0;
   text = text.replace(/\?/g, () => `$${++idx}`);
 

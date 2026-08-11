@@ -68,11 +68,9 @@ async function generateContentWithFallback(ai: any, options: any) {
       userIdentifiers = Array.from(new Set(userIdentifiers.filter(Boolean)));
       
       // Strict Multi-Tier Isolation: ONLY tasks where user is Assignee OR Reporter
-      const placeholders = userIdentifiers.map(() => '?').join(', ');
-      const queryParams = [projectId, ...userIdentifiers, ...userIdentifiers];
       const [tasksRows]: any = await connection.query(
-        `SELECT * FROM Tasks WHERE projectId = ? AND ((assigneeId IN (${placeholders}) OR reporterId IN (${placeholders}))) ORDER BY orderIndex ASC, createdAt DESC LIMIT 2000`,
-        queryParams
+        "SELECT * FROM Tasks WHERE projectId = ? AND (assigneeId IN (?) OR reporterId IN (?)) ORDER BY orderIndex ASC, createdAt DESC LIMIT 2000",
+        [projectId, userIdentifiers, userIdentifiers]
       );
       
       const [linksRows]: any = await connection.query(
@@ -904,11 +902,9 @@ function checkUserPermissionBackend(role: string, customPermissions: any, action
       const dbUserUid = userRows[0]?.uid;
 
       // Find tasks belonging to project
-      const safeTaskIds = taskIds.map((id: string) => mysqlPool.escape(id)).join(',');
-      const safeProjectId = mysqlPool.escape(projectId);
-
       const [taskRows]: any = await connection.query(
-        `SELECT id, projectId, reporterId, assigneeId FROM Tasks WHERE id IN (${safeTaskIds}) AND projectId = ${safeProjectId}`
+        "SELECT id, projectId, reporterId, assigneeId FROM Tasks WHERE id IN (?) AND projectId = ?",
+        [taskIds, projectId]
       );
 
       const deletableTaskIds: string[] = [];
@@ -932,9 +928,9 @@ function checkUserPermissionBackend(role: string, customPermissions: any, action
         });
       }
 
-      const safeDeletableIds = deletableTaskIds.map((id: string) => mysqlPool.escape(id)).join(',');
       await connection.query(
-        `DELETE FROM Tasks WHERE id IN (${safeDeletableIds}) AND projectId = ${safeProjectId}`
+        "DELETE FROM Tasks WHERE id IN (?) AND projectId = ?",
+        [deletableTaskIds, projectId]
       );
 
       for (const deletedId of deletableTaskIds) {
@@ -1139,7 +1135,6 @@ function checkUserPermissionBackend(role: string, customPermissions: any, action
         }
       }
       
-      const placeholders = userIds.map(() => '?').join(',');
       // Secure, high-performance, and unified candidate selection query (Anti-IDOR)
       const sqlQuery = `
         SELECT n.*, 
@@ -1150,12 +1145,12 @@ function checkUserPermissionBackend(role: string, customPermissions: any, action
         LEFT JOIN Tasks t ON n.relatedId = t.id
         LEFT JOIN Meetings m ON n.relatedId = m.id
         LEFT JOIN ActivityLogs a ON n.relatedId = a.id
-        WHERE n.recipientId IN (${placeholders})
+        WHERE n.recipientId IN (?)
         ORDER BY n.createdAt DESC
         LIMIT 150
       `;
       
-      const [rows]: any = await connection.query(sqlQuery, [...userIds]);
+      const [rows]: any = await connection.query(sqlQuery, [userIds]);
       
       // Dynamic multi-layered verification filter for role-based security & spam protection
       const filteredNotifications = rows.filter((row: any) => {

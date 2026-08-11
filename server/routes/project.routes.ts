@@ -38,13 +38,12 @@ const router = express.Router();
       if (projects.length > 0) {
         const projectIds = projects.map(p => p.id);
         
-        const placeholders = projectIds.map(() => '?').join(',');
         const [allMemberRows]: any = await connection.query(
           `SELECT pm.projectId, u.uid, u.id as uuid, pm.role 
            FROM ProjectMembers pm
            JOIN Users u ON (pm.userId = u.id OR pm.userId = u.uid)
-           WHERE pm.projectId IN (${placeholders})`,
-          [...projectIds]
+           WHERE pm.projectId IN (?)`,
+          [projectIds]
         );
         
         const membersByProject = new Map();
