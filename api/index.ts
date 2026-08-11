@@ -1,6 +1,12 @@
 import { createRequire } from "module";
+import { fileURLToPath } from "url";
+import path from "path";
 
-const requireFunc = createRequire(import.meta.url);
+const currentFilePath = (typeof import.meta !== 'undefined' && import.meta?.url)
+  ? fileURLToPath(import.meta.url)
+  : path.join(process.cwd(), 'api', 'index.ts');
+
+const requireFunc = createRequire(currentFilePath);
 
 let serverModule: any = null;
 let serverLoadError: any = null;

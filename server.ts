@@ -4567,4 +4567,4 @@ app.use(errorHandler);
   });
 }
 
-export const initializationPromise = process.env.NODE_ENV !== 'test' ? startServer() : Promise.resolve();
+export const initializationPromise = (process.env.NODE_ENV !== 'test' && !isServerless) ? startServer() : Promise.resolve();
