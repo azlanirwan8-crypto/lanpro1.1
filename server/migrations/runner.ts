@@ -171,9 +171,16 @@ export async function runMigrations() {
             phase VARCHAR(50) NOT NULL,
             uploadedBy VARCHAR(255) NOT NULL,
             uploadedAt VARCHAR(50) NOT NULL,
-            fileName VARCHAR(255)
+            fileName VARCHAR(255),
+            assignedTo VARCHAR(255)
           );
         `);
+        try {
+          await checkConn.query(`ALTER TABLE QATestSuites ADD COLUMN IF NOT EXISTS assignedTo VARCHAR(255);`);
+        } catch (e) { /* ignore if alter fails */ }
+        try {
+          await checkConn.query(`ALTER TABLE QATestCases ADD COLUMN IF NOT EXISTS assignedTo VARCHAR(255);`);
+        } catch (e) { /* ignore if alter fails */ }
         console.log("[MIGRATION] Tabel QATestSuites berhasil dipastikan ada.");
       } catch (qasErr) {
         console.warn("[MIGRATION] Gagal membuat tabel QATestSuites:", qasErr);

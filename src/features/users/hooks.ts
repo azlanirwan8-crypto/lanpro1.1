@@ -26,11 +26,13 @@ export const useAdminUsers = () => {
 
   const [saving, setSaving] = useState(false);
 
-  // Pagination & Filtering
+  // Pagination, Filtering & Sorting
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [sortField, setSortField] = useState<'name' | 'department' | 'role' | 'status'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -157,15 +159,39 @@ export const useAdminUsers = () => {
   const filteredUsers = users.filter(user => {
     const matchesSearch = (user?.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            user?.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           user?.email?.toLowerCase().includes(searchTerm.toLowerCase()));
+                           user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           user?.phone?.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesRole = filterRole === 'all' || user.role === filterRole;
     const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
     
     return matchesSearch && matchesRole && matchesStatus;
   });
 
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-  const paginatedUsers = filteredUsers.slice(
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    let valA = '';
+    let valB = '';
+
+    if (sortField === 'name') {
+      valA = (a.displayName || a.username || '').toLowerCase();
+      valB = (b.displayName || b.username || '').toLowerCase();
+    } else if (sortField === 'department') {
+      valA = (a.department || '').toLowerCase();
+      valB = (b.department || '').toLowerCase();
+    } else if (sortField === 'role') {
+      valA = (a.role || '').toLowerCase();
+      valB = (b.role || '').toLowerCase();
+    } else if (sortField === 'status') {
+      valA = (a.status || '').toLowerCase();
+      valB = (b.status || '').toLowerCase();
+    }
+
+    if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+    if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const totalPages = Math.ceil(sortedUsers.length / itemsPerPage);
+  const paginatedUsers = sortedUsers.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -201,6 +227,11 @@ export const useAdminUsers = () => {
     currentPage,
     setCurrentPage,
     itemsPerPage,
+    setItemsPerPage,
+    sortField,
+    setSortField,
+    sortOrder,
+    setSortOrder,
     filterRole,
     setFilterRole,
     filterStatus,

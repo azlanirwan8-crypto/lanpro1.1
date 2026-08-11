@@ -385,6 +385,11 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
     currentPage,
     setCurrentPage,
     itemsPerPage,
+    setItemsPerPage,
+    sortField,
+    setSortField,
+    sortOrder,
+    setSortOrder,
     filterRole,
     setFilterRole,
     filterStatus,
@@ -399,6 +404,15 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
     paginatedUsers,
     fetchUsers
   } = useAdminUsers();
+
+  const handleSort = (field: 'name' | 'department' | 'role' | 'status') => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
 
   // Point 1: Bulk Actions State
   const [selectedUserIds, setSelectedUserIds] = React.useState<string[]>([]);
@@ -775,7 +789,7 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
             <table className="w-full text-left border-collapse min-w-[900px]">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  <th className="py-4 px-4 text-center w-12">
+                  <th className="py-3.5 px-4 text-center w-12">
                     <input
                       type="checkbox"
                       checked={paginatedUsers.length > 0 && paginatedUsers.every(u => selectedUserIds.includes(u.id))}
@@ -794,12 +808,52 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
                       className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer"
                     />
                   </th>
-                  <th className="py-4 px-4 w-60">User</th>
-                  <th className="py-4 px-4 w-60">Department / Position</th>
-                  <th className="py-4 px-4 w-40">Proyek & Tugas</th>
-                  <th className="py-4 px-4 w-28">Role</th>
-                  <th className="py-4 px-4 w-28 text-center">Status</th>
-                  <th className="py-4 px-4 w-28 text-center">Action</th>
+                  <th
+                    onClick={() => handleSort('name')}
+                    className="py-3.5 px-4 w-60 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>User</span>
+                      <span className="text-[10px] text-slate-400 group-hover:text-indigo-600">
+                        {sortField === 'name' ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('department')}
+                    className="py-3.5 px-4 w-60 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Department / Position</span>
+                      <span className="text-[10px] text-slate-400 group-hover:text-indigo-600">
+                        {sortField === 'department' ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className="py-3.5 px-4 w-40">Proyek & Tugas</th>
+                  <th
+                    onClick={() => handleSort('role')}
+                    className="py-3.5 px-4 w-28 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Role</span>
+                      <span className="text-[10px] text-slate-400 group-hover:text-indigo-600">
+                        {sortField === 'role' ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('status')}
+                    className="py-3.5 px-4 w-28 text-center cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                  >
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>Status</span>
+                      <span className="text-[10px] text-slate-400 group-hover:text-indigo-600">
+                        {sortField === 'status' ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className="py-3.5 px-4 w-28 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100/60">
@@ -819,7 +873,7 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
 
                   return (
                     <tr key={user.id} className="hover:bg-indigo-50/30 transition-colors group">
-                      <td className="py-4 px-4 text-center">
+                      <td className="py-3.5 px-4 text-center">
                         <input
                           type="checkbox"
                           checked={selectedUserIds.includes(user.id)}
@@ -833,16 +887,16 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
                           className="w-4 h-4 rounded text-indigo-650 border-slate-300 focus:ring-indigo-500 cursor-pointer"
                         />
                       </td>
-                      <td className="py-4 px-4 cursor-pointer" onClick={() => { if (props.onSelectUserForDetail) props.onSelectUserForDetail(user); }}>
-                        <div className="flex items-center gap-4">
-                          <UserAvatar user={user} className="w-10 h-10 text-base" />
+                      <td className="py-3.5 px-4 cursor-pointer" onClick={() => { if (props.onSelectUserForDetail) props.onSelectUserForDetail(user); }}>
+                        <div className="flex items-center gap-3.5">
+                          <UserAvatar user={user} className="w-9 h-9 text-sm shrink-0" />
                           <div>
-                            <div className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">
+                            <div className="font-bold text-slate-800 text-xs group-hover:text-indigo-600 transition-colors">
                               {user?.displayName || user?.username}
                             </div>
-                            <div className="text-xs text-slate-500">{user?.email || 'Email tidak tersedia'}</div>
+                            <div className="text-[11px] text-slate-500">{user?.email || 'Email tidak tersedia'}</div>
                             {user.phone && (
-                              <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 mt-0.5">
+                              <div className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 mt-0.5">
                                 <span>WA/HP:</span>
                                 <span>{user.phone}</span>
                               </div>
@@ -850,7 +904,7 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-3.5 px-4">
                           <div className="flex flex-col">
                               <span className="text-xs font-bold text-slate-700">
                                   {user.department ? getDepartmentName(user.department) : '-'}
@@ -860,11 +914,11 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
                               </span>
                           </div>
                       </td>
-                      <td className="py-4 px-4">
-                        <div className="flex flex-col gap-1.5">
+                      <td className="py-3.5 px-4">
+                        <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <span className={cn(
-                              "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold border transition-colors",
+                              "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors",
                               userProjectsCount > 0
                                 ? "bg-indigo-50/65 text-indigo-700 border-indigo-100/70"
                                 : "bg-slate-50/50 text-slate-400 border-slate-100"
@@ -875,7 +929,7 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className={cn(
-                              "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold border transition-colors",
+                              "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors",
                               userTasksCount > 0
                                 ? "bg-violet-50/65 text-violet-700 border-violet-100/70"
                                 : "bg-slate-50/50 text-slate-400 border-slate-100"
@@ -886,9 +940,9 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-3.5 px-4">
                         <span className={cn(
-                          "inline-flex font-black text-[10px] tracking-widest uppercase px-2.5 py-1 rounded-lg border",
+                          "inline-flex font-black text-[9px] tracking-widest uppercase px-2 py-0.5 rounded-md border",
                           user.role === 'admin' ? "bg-rose-50 text-rose-600 border-rose-200" :
                           user.role === 'head' ? "bg-purple-50 text-purple-600 border-purple-200" :
                           user.role === 'manager' ? "bg-blue-50 text-blue-600 border-blue-200" :
@@ -897,25 +951,25 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
                           {user.role}
                         </span>
                       </td>
-                    <td className="py-4 px-4 text-center">
+                    <td className="py-3.5 px-4 text-center">
                       <div className="flex justify-center">
                         {user.status === 'approved' ? (
-                          <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500" title="Disetujui">
-                            <CheckCircle className="w-4 h-4" />
+                          <div className="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500" title="Disetujui">
+                            <CheckCircle className="w-3.5 h-3.5" />
                           </div>
                         ) : user.status === 'pending' ? (
-                          <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 animate-pulse" title="Menunggu">
-                            <Clock className="w-4 h-4" />
+                          <div className="w-7 h-7 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 animate-pulse" title="Menunggu">
+                            <Clock className="w-3.5 h-3.5" />
                           </div>
                         ) : (
-                          <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-500" title="Ditolak">
-                            <XCircle className="w-4 h-4" />
+                          <div className="w-7 h-7 rounded-full bg-rose-50 flex items-center justify-center text-rose-500" title="Ditolak">
+                            <XCircle className="w-3.5 h-3.5" />
                           </div>
                         )}
                       </div>
                     </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center justify-center gap-2">
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => {
                             if (props.onSelectUserForDetail) {
@@ -925,10 +979,10 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
                               openEditModal(user);
                             }
                           }}
-                          className="p-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white border border-indigo-200/80 rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer font-bold flex items-center justify-center gap-1"
+                          className="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white border border-indigo-200/80 rounded-lg transition-all shadow-xs active:scale-95 cursor-pointer font-bold flex items-center justify-center gap-1"
                           title="Detail Pengguna"
                         >
-                          <UserCog className="w-4 h-4 shrink-0" />
+                          <UserCog className="w-3.5 h-3.5 shrink-0" />
                         </button>
                         <button
                           onClick={() => {
@@ -951,10 +1005,10 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
                             });
                           }}
                           disabled={user.role === 'admin'}
-                          className="p-2 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200/80 rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed font-bold flex items-center justify-center gap-1"
+                          className="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200/80 rounded-lg transition-all shadow-xs active:scale-95 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed font-bold flex items-center justify-center gap-1"
                           title="Hapus Pengguna"
                         >
-                          <Trash2 className="w-4 h-4 shrink-0" />
+                          <Trash2 className="w-3.5 h-3.5 shrink-0" />
                         </button>
                       </div>
                     </td>
@@ -971,46 +1025,63 @@ export const AdminUserPanel: React.FC<AdminUserPanelProps> = (props) => {
             </table>
           </div>
 
-           {/* Pagination */}
-           {totalPages > 1 && (
-            <div className="border-t border-slate-100 p-4 flex items-center justify-between bg-slate-50/50 mt-auto">
-              <span className="text-sm font-medium text-slate-500">
-                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredUsers.length)} of {filteredUsers.length}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="rounded-lg"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                {Array.from({ length: totalPages }).map((_, i) => (
-                    <button
-                        key={i}
-                        onClick={() => setCurrentPage(i + 1)}
-                        className={cn(
-                            "w-8 h-8 rounded-lg text-sm font-bold transition-colors",
-                            currentPage === i + 1 ? "bg-indigo-600 text-white" : "bg-white border text-slate-600 hover:bg-slate-50"
-                        )}
-                    >
-                        {i + 1}
-                    </button>
-                ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="rounded-lg"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-           )}
+           {/* Enterprise DataTable Pagination & Entries Controls */}
+           <div className="border-t border-slate-100 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/50 mt-auto">
+             <div className="flex items-center gap-3">
+               <span className="text-xs font-semibold text-slate-500">
+                 Showing {filteredUsers.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredUsers.length)} of {filteredUsers.length} entries
+               </span>
+               <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                 <span>Rows per page:</span>
+                 <select
+                   value={itemsPerPage}
+                   onChange={(e) => {
+                     setItemsPerPage(Number(e.target.value));
+                     setCurrentPage(1);
+                   }}
+                   className="bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 cursor-pointer"
+                 >
+                   <option value={10}>10</option>
+                   <option value={25}>25</option>
+                   <option value={50}>50</option>
+                   <option value={100}>100</option>
+                 </select>
+               </div>
+             </div>
+
+             <div className="flex items-center gap-1">
+               <Button
+                 variant="outline"
+                 size="sm"
+                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                 disabled={currentPage === 1}
+                 className="rounded-lg h-8 px-2.5 text-xs font-bold"
+               >
+                 <ChevronLeft className="w-4 h-4 mr-1" /> Prev
+               </Button>
+               {Array.from({ length: totalPages }).map((_, i) => (
+                   <button
+                       key={i}
+                       onClick={() => setCurrentPage(i + 1)}
+                       className={cn(
+                           "w-7 h-7 rounded-lg text-xs font-bold transition-colors",
+                           currentPage === i + 1 ? "bg-indigo-600 text-white shadow-2xs" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                       )}
+                   >
+                       {i + 1}
+                   </button>
+               ))}
+               <Button
+                 variant="outline"
+                 size="sm"
+                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                 disabled={currentPage === totalPages || totalPages === 0}
+                 className="rounded-lg h-8 px-2.5 text-xs font-bold"
+               >
+                 Next <ChevronRight className="w-4 h-4 ml-1" />
+               </Button>
+             </div>
+           </div>
         </div>
         </div>
       </div>

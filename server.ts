@@ -1335,8 +1335,8 @@ async function startServer() {
       const suite = req.body;
       connection = await mysqlPool.getConnection();
       await connection.query(
-        `INSERT INTO QATestSuites (id, projectId, name, phase, uploadedBy, uploadedAt, fileName)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO QATestSuites (id, projectId, name, phase, uploadedBy, uploadedAt, fileName, assignedTo)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           suite.id,
           projectId,
@@ -1344,7 +1344,8 @@ async function startServer() {
           suite.phase,
           suite.uploadedBy,
           suite.uploadedAt || new Date().toISOString(),
-          suite.fileName || null
+          suite.fileName || null,
+          suite.assignedTo || null
         ]
       );
       res.json({ status: "success", message: "Test Suite created", data: suite });
@@ -1363,7 +1364,7 @@ async function startServer() {
       const suite = req.body;
       connection = await mysqlPool.getConnection();
       await connection.query(
-        `UPDATE QATestSuites SET name = ?, phase = ?, uploadedBy = ?, uploadedAt = ?, fileName = ?
+        `UPDATE QATestSuites SET name = ?, phase = ?, uploadedBy = ?, uploadedAt = ?, fileName = ?, assignedTo = ?
          WHERE id = ? AND projectId = ?`,
         [
           suite.name,
@@ -1371,6 +1372,7 @@ async function startServer() {
           suite.uploadedBy,
           suite.uploadedAt,
           suite.fileName || null,
+          suite.assignedTo || null,
           id,
           projectId
         ]
@@ -1470,8 +1472,8 @@ async function startServer() {
       await connection.query(
         `INSERT INTO QATestCases (
           id, projectId, judul, deskripsi, tipeTesting, prioritas, caseId, expected, status, steps, history, createdAt, activeTesterId, activeTesterName, lockedAt, modulId,
-          suiteId, rowNum, comment, evidenceUrl, evidenceType, evidenceName, linkedBugKey, commentsList, evidences
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          suiteId, rowNum, comment, evidenceUrl, evidenceType, evidenceName, linkedBugKey, commentsList, evidences, assignedTo
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           tc.id,
           projectId,
@@ -1497,7 +1499,8 @@ async function startServer() {
           tc.evidenceName || null,
           tc.linkedBugKey || null,
           JSON.stringify(tc.commentsList || []),
-          JSON.stringify(tc.evidences || [])
+          JSON.stringify(tc.evidences || []),
+          tc.assignedTo || null
         ]
       );
       
@@ -1540,7 +1543,8 @@ async function startServer() {
           evidenceName = ?,
           linkedBugKey = ?,
           commentsList = ?,
-          evidences = ?
+          evidences = ?,
+          assignedTo = ?
          WHERE id = ? AND projectId = ?`,
         [
           tc.judul || tc.title,
@@ -1565,6 +1569,7 @@ async function startServer() {
           tc.linkedBugKey || null,
           JSON.stringify(tc.commentsList || []),
           JSON.stringify(tc.evidences || []),
+          tc.assignedTo || null,
           id,
           projectId
         ]

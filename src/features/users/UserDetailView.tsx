@@ -109,8 +109,26 @@ export const UserDetailView: React.FC<UserDetailViewProps> = ({
 
   // Project Delegation State
   const [selectedAssignProjectId, setSelectedAssignProjectId] = useState<string>('');
-  const [selectedAssignProjectRole, setSelectedAssignProjectRole] = useState<string>('Member');
+  const [selectedAssignProjectRole, setSelectedAssignProjectRole] = useState<string>('member');
+  const [selectedSubordinateIds, setSelectedSubordinateIds] = useState<string[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [userProjectsList, setUserProjectsList] = useState<Project[]>([]);
+
+  // Fetch users for Sub-Team / PIC subordinate selection
+  useEffect(() => {
+    fetch('/api/users', {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('lanpro_jwt_token')}`
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          setAvailableUsers(data.data || []);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Sync state when user changes
   useEffect(() => {
@@ -227,21 +245,28 @@ export const UserDetailView: React.FC<UserDetailViewProps> = ({
       const p = projects.find(proj => proj.id === selectedAssignProjectId);
       if (!p) return;
 
-      const currentMembers = p.members || [];
       const userId = user.id || user.uid;
-      const updatedMembers = Array.from(new Set([...currentMembers, userId]));
-      const updatedRoles = { ...(p.memberRoles || {}), [userId]: selectedAssignProjectRole };
 
-      await apiRequest(`/api/projects/${p.id}`, {
+      const res = await apiRequest(`/api/projects/${p.id}/members`, {
         method: 'PUT',
-        body: { members: updatedMembers, memberRoles: updatedRoles }
+        body: { newMemberId: userId, newMemberRole: selectedAssignProjectRole }
       });
+
+      if (res && res.status === 'error') {
+        throw new Error(res.message);
+      }
 
       toast.success(`Pengguna berhasil ditugaskan ke project ${p.name}`);
       setSelectedAssignProjectId('');
+      
+      setUserProjectsList(prev => [...prev, {
+        ...p,
+        memberRoles: { ...(p.memberRoles || {}), [userId]: selectedAssignProjectRole }
+      }]);
+
       if (onUserUpdated) onUserUpdated();
-    } catch (e) {
-      toast.error('Gagal menugaskan pengguna ke project');
+    } catch (e: any) {
+      toast.error('Gagal menugaskan pengguna ke project: ' + (e.message || e));
     }
   };
 
@@ -251,19 +276,22 @@ export const UserDetailView: React.FC<UserDetailViewProps> = ({
       if (!p) return;
 
       const userId = user.id || user.uid;
-      const updatedMembers = (p.members || []).filter(m => m !== userId);
-      const updatedRoles = { ...(p.memberRoles || {}) };
-      delete updatedRoles[userId];
 
-      await apiRequest(`/api/projects/${p.id}`, {
-        method: 'PUT',
-        body: { members: updatedMembers, memberRoles: updatedRoles }
+      const res = await apiRequest(`/api/projects/${p.id}/members/${userId}`, {
+        method: 'DELETE'
       });
 
-      toast.success(`Pengguna dikeluarkan dari project ${p.name}`);
+      if (res && res.status === 'error') {
+        throw new Error(res.message);
+      }
+
+      toast.success(`Pengguna berhasil dikeluarkan dari project ${p.name}`);
+      
+      setUserProjectsList(prev => prev.filter(proj => proj.id !== projectId));
+
       if (onUserUpdated) onUserUpdated();
-    } catch (e) {
-      toast.error('Gagal mengeluarkan pengguna dari project');
+    } catch (e: any) {
+      toast.error('Gagal mengeluarkan pengguna dari project: ' + (e.message || e));
     }
   };
 
@@ -696,11 +724,12 @@ export const UserDetailView: React.FC<UserDetailViewProps> = ({
                     onChange={(e) => setSelectedAssignProjectRole(e.target.value)}
                     className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-medium text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-500"
                   >
-                    <option value="Owner">Owner</option>
-                    <option value="Lead">Lead</option>
-                    <option value="Manager">Manager</option>
-                    <option value="Member">Member</option>
-                    <option value="Viewer">Viewer</option>
+                    <option value="admin">Project Admin (Administrator Proyek)</option>
+                    <option value="manager">Project Manager (Manager Proyek)</option>
+                    <option value="lead">Project Lead (Lead Proyek)</option>
+                    <option value="member">Member (Anggota Tim)</option>
+                    <option value="viewer">Viewer (Pengamat)</option>
+                    <option value="owner">Owner (Pemilik Proyek)</option>
                   </select>
                 </div>
 
@@ -715,6 +744,39 @@ export const UserDetailView: React.FC<UserDetailViewProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Sub-Team Subordinate Selection (When Project Admin / Manager / Lead is selected) */}
+              {['admin', 'manager', 'lead'].includes(selectedAssignProjectRole.toLowerCase()) && (
+                <div className="pt-2 space-y-1.5 border-t border-indigo-100 dark:border-indigo-900/50">
+                  <label className="text-[11px] font-extrabold text-indigo-950 dark:text-indigo-200 uppercase tracking-wider block">
+                    Pilih Sub-Tim / PIC Bawahan (Tim di bawah Project Admin ini):
+                  </label>
+                  <div className="max-h-36 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-2 space-y-1 custom-scrollbar">
+                    {availableUsers.filter(u => (u.id || u.uid) !== (user.id || user.uid)).map(u => {
+                      const uId = u.id || u.uid;
+                      const isChecked = selectedSubordinateIds.includes(uId);
+                      return (
+                        <label key={uId} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 p-1 rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                setSelectedSubordinateIds(selectedSubordinateIds.filter(id => id !== uId));
+                              } else {
+                                setSelectedSubordinateIds([...selectedSubordinateIds, uId]);
+                              }
+                            }}
+                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="font-semibold">{u.displayName || u.username || u.email}</span>
+                          <span className="text-[10px] text-slate-400">({u.email})</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* List Proyek Terkait */}

@@ -412,9 +412,11 @@ export async function runMigrations(pool: Pool): Promise<void> {
         phase        VARCHAR(50) NOT NULL,
         "uploadedBy" VARCHAR(255) NOT NULL,
         "uploadedAt" VARCHAR(50) NOT NULL,
-        "fileName"   VARCHAR(255)
+        "fileName"   VARCHAR(255),
+        "assignedTo" VARCHAR(255)
       );
     `);
+    await client.query(`ALTER TABLE "QATestSuites" ADD COLUMN IF NOT EXISTS "assignedTo" VARCHAR(255);`);
 
     // ── QATestCases ──────────────────────────────────────────────────────────
     await client.query(`
@@ -443,9 +445,11 @@ export async function runMigrations(pool: Pool): Promise<void> {
         "linkedBugKey"    VARCHAR(50),
         "commentsList"    JSONB,
         evidences         JSONB,
-        "modulId"         VARCHAR(36)
+        "modulId"         VARCHAR(36),
+        "assignedTo"      VARCHAR(255)
       );
     `);
+    await client.query(`ALTER TABLE "QATestCases" ADD COLUMN IF NOT EXISTS "assignedTo" VARCHAR(255);`);
 
     // ── QATestCaseExecutionLogs ───────────────────────────────────────────────
     await client.query(`

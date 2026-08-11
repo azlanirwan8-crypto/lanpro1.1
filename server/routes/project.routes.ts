@@ -700,15 +700,24 @@ const router = express.Router();
       
       // Resolve user id first (if they passed firebase uid, get their UUID)
       const [users] = await connection.query(
-        "SELECT id FROM Users WHERE id = ? OR uid = ?",
+        "SELECT id, uid FROM Users WHERE id = ? OR uid = ?",
         [userId, userId]
       );
       
       if ((users as any[]).length > 0) {
         const resolvedUserId = (users as any[])[0].id;
+        const resolvedUserUid = (users as any[])[0].uid;
+
+        // 1. Remove from ProjectMembers
         await connection.query(
-          "DELETE FROM ProjectMembers WHERE projectId = ? AND userId = ?",
-          [id, resolvedUserId]
+          "DELETE FROM ProjectMembers WHERE projectId = ? AND (userId = ? OR userId = ?)",
+          [id, resolvedUserId, userId]
+        );
+
+        // 2. Clear ownerId in Projects if user was owner
+        await connection.query(
+          "UPDATE Projects SET ownerId = NULL WHERE id = ? AND (ownerId = ? OR ownerId = ? OR ownerId = ?)",
+          [id, resolvedUserId, resolvedUserUid, userId]
         );
       }
       
